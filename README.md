@@ -1,111 +1,117 @@
-# tws_manager — Go-клиент SPP
+English · **[Русская версия](README_RU.md)**
 
-CLI/TUI и GUI-клиент для наушников и гарнитур **Nothing** и **CMF** по Bluetooth RFCOMM (SPP). Читает батарею, статус, ANC/EQ/spatial/dual, ведёт лог пакетов и позволяет безопасно исследовать протокол без официального приложения.
+# Client for controlling Nothing earbuds
 
-Проект не аффилирован с Nothing Technology Limited. Названия Nothing/CMF и связанные товарные знаки принадлежат их правообладателям и используются только для описания совместимости.
+### It probably works with all supported models, but there is no absolute guarantee - bug reports are welcome
 
-Работает **локально** на Linux: обнаружение через `bluetoothctl`, RFCOMM `/dev/rfcommN`, без сетевого API.
+# tws_manager - Go SPP client
 
-Пример работы
-![главное_окно](pics/main_control.png)
+CLI/TUI and GUI client for **Nothing** and **CMF** earbuds and headsets over Bluetooth RFCOMM (SPP). Reads battery, status, ANC/EQ/spatial/dual, logs packets, and lets you explore the protocol safely without the official app.
 
-![логи_и_дебаг](pics/logs.png)
+This project is not affiliated with Nothing Technology Limited. Nothing/CMF names and related trademarks belong to their respective owners and are used here only to describe compatibility.
 
+Runs **locally** on Linux: discovery via `bluetoothctl`, RFCOMM `/dev/rfcommN`, no network API.
 
-## Возможности
+Example
 
-- **TUI** (Bubble Tea) — устройства, управление, лог пакетов
-- **GUI** (Gio, `-tags gio`) — тот же функционал в графическом интерфейсе
-- **System tray** (`-tags systray`) — статус, батарея, reconnect из трея
-- **Автоподключение** — поиск Nothing/CMF и reconnect при обрыве
-- **Парсинг протокола** — батарея (L/R/case), статус, identity, firmware, ANC, EQ, spatial, dual, lag
-- **Трассировка** — NDJSON-сессия TX/RX, экспорт в JSON (`captures/`)
-- **Desktop-уведомления** — connect/disconnect, батарея, low-battery (`--notify`)
-- **Безопасность по умолчанию** — GET-команды и ограниченный набор валидированных UI SET; raw scan и не-UI SET требуют `--unsafe`
+![main window](pics/main_control.png)
 
-## Требования
+![logs and debug](pics/logs.png)
 
-| Компонент | Назначение |
-|-----------|------------|
-| Go **1.26+** | сборка |
+## Features
+
+- **TUI** (Bubble Tea) - devices, control, packet log
+- **GUI** (Gio, `-tags gio`) - same functionality in a graphical interface
+- **System tray** (`-tags systray`) - status, battery, reconnect from the tray
+- **Auto-connect** - discover Nothing/CMF devices and reconnect on link loss
+- **Protocol parsing** - battery (L/R/case), status, identity, firmware, ANC, EQ, spatial, dual, lag
+- **Tracing** - NDJSON TX/RX session log, JSON export (`captures/`)
+- **Desktop notifications** - connect/disconnect, battery, low-battery (`--notify`)
+- **Safe by default** - GET commands and a limited set of validated UI SET commands; raw scan and non-UI SET require `--unsafe`
+
+## Requirements
+
+| Component | Purpose |
+|-----------|---------|
+| Go **1.26+** | build |
 | **BlueZ** (`bluetoothctl`, `rfcomm`) | Bluetooth |
-| Privileged helper (`polkit`) или `sudo` | bind/release RFCOMM, chown/chmod |
-| `vulkan-headers` (Linux) | только для Gio GUI |
+| Privileged helper (`polkit`) or `sudo` | bind/release RFCOMM, chown/chmod |
+| `vulkan-headers` (Linux) | Gio GUI only |
 | `libayatana-appindicator` | system tray (Arch/Manjaro: `pacman -S libayatana-appindicator`) |
 
-Наушники должны быть **сопряжены** в системе. Канал RFCOMM по умолчанию — **15** (типично для Nothing Ear).
+Headphones must be **paired** in the system. Default RFCOMM channel is **15** (typical for Nothing Ear).
 
-## Быстрый старт
+## Quick start
 
 ```bash
-# клонировать и собрать
+# clone and build
 git clone <repo-url> tws_manager && cd tws_manager
 make build          # bin/tws_manager (TUI)
 make test
 
-# TUI — уже есть /dev/rfcomm0
+# TUI - /dev/rfcomm0 already exists
 make run ARGS="--device /dev/rfcomm0"
 
-# TUI — создать RFCOMM интерактивно (preflight)
+# TUI - create RFCOMM interactively (preflight)
 make run
 
-# с явным MAC
+# explicit MAC
 go run ./cmd/tws_manager --device /dev/rfcomm0 --addr AA:BB:CC:DD:EE:FF --channel 15
 
-# автопоиск и подключение
+# auto-discover and connect
 go run ./cmd/tws_manager --auto
 
-# Gio GUI (tray по умолчанию)
+# Gio GUI (tray enabled by default)
 make run-gio
 
-# Gio без tray (без libayatana-appindicator)
+# Gio without tray (no libayatana-appindicator)
 make run-gio-lite
 ```
 
-При первом запуске без готового `/dev/rfcommN` TUI предложит выбрать устройство из discovery и создать RFCOMM-узел (режим зависит от `--privilege-helper`).
+On first run without a ready `/dev/rfcommN`, the TUI will offer to pick a device from discovery and create the RFCOMM node (behavior depends on `--privilege-helper`).
 
-## Сборка
+## Build
 
-| Цель | Команда | Результат |
-|------|---------|-----------|
+| Target | Command | Output |
+|--------|---------|--------|
 | TUI | `make build` | `bin/tws_manager` |
 | TUI + tray | `make build-systray` | `bin/tws_manager` |
 | Gio + tray | `make build-gio` | `bin/tws_manager_gio` |
-| Gio без tray | `make build-gio-lite` | `bin/tws_manager_gio` |
-| Тесты | `make test` | `go test ./...` |
+| Gio without tray | `make build-gio-lite` | `bin/tws_manager_gio` |
+| Tests | `make test` | `go test ./...` |
 
-## Флаги CLI
+## CLI flags
 
-Общие для `cmd/tws_manager` и `cmd/tws_manager_gio` (значения по умолчанию могут отличаться):
+Shared by `cmd/tws_manager` and `cmd/tws_manager_gio` (defaults may differ):
 
-| Флаг | По умолчанию | Описание |
-|------|--------------|----------|
-| `--device` | `/dev/rfcomm0` | RFCOMM-устройство (`/dev/rfcomm[0-9]+`) |
-| `--addr` | — | MAC Bluetooth; пропускает discovery при bind |
-| `--channel` | `15` | RFCOMM-канал при создании `--device` |
-| `--model` | — | codename, имя продукта или Fast Pair ID |
-| `--log` | auto в `captures/` | путь к NDJSON-трассировке |
-| `--log-raw` | `false` | включить raw bytes в лог/экспорт |
-| `--capture-dir` | `captures` | каталог JSON-экспорта пакетов |
-| `--no-probe` | `false` | не слать identity/battery после connect |
-| `--query-every` | `0` | периодический GET_BATTERY, напр. `30s` |
-| `--unsafe` | `false` | разрешить SET и raw scan в UI |
-| `--auto` | TUI: `false`, Gio: `true` | автопоиск и подключение |
-| `--notify` | TUI: `false`, Gio: `true` | desktop-уведомления |
-| `--privilege-helper` | TUI: `sudo`, Gio: `auto` | backend для privileged операций: `sudo`, `polkit`, `auto`, `none` |
-| `--privilege-helper-path` | — | путь к `tws_manager_rfcomm_helper` для `polkit` |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--device` | `/dev/rfcomm0` | RFCOMM device (`/dev/rfcomm[0-9]+`) |
+| `--addr` | - | Bluetooth MAC; skips discovery on bind |
+| `--channel` | `15` | RFCOMM channel when creating `--device` |
+| `--model` | - | codename, product name, or Fast Pair ID |
+| `--log` | auto in `captures/` | NDJSON trace path |
+| `--log-raw` | `false` | include raw bytes in log/export |
+| `--capture-dir` | `captures` | JSON packet export directory |
+| `--no-probe` | `false` | skip identity/battery probes after connect |
+| `--query-every` | `0` | periodic GET_BATTERY, e.g. `30s` |
+| `--unsafe` | `false` | allow SET and raw scan in UI |
+| `--auto` | TUI: `false`, Gio: `true` | auto-discover and connect |
+| `--notify` | TUI: `false`, Gio: `true` | desktop notifications |
+| `--privilege-helper` | TUI: `sudo`, Gio: `auto` | backend for privileged ops: `sudo`, `polkit`, `auto`, `none` |
+| `--privilege-helper-path` | - | path to `tws_manager_rfcomm_helper` for `polkit` |
 
-Пример с трассировкой:
+Tracing example:
 
 ```bash
 go run ./cmd/tws_manager --device /dev/rfcomm0 --log captures/session.ndjson --log-raw
 ```
 
-## Поддерживаемые устройства
+## Supported devices
 
-Модель определяется по identity, имени Bluetooth или Fast Pair ID. Можно задать явно: `--model EarThree`.
+Model is detected from identity, Bluetooth name, or Fast Pair ID. Override explicitly: `--model EarThree`.
 
-| Codename | Продукт | Основные фичи |
+| Codename | Product | Main features |
 |----------|---------|---------------|
 | EarOne | Nothing ear (1) | anc, eq |
 | EarTwo | Ear (2) | anc, eq, dual |
@@ -120,60 +126,60 @@ go run ./cmd/tws_manager --device /dev/rfcomm0 --log captures/session.ndjson --l
 | Corsola | CMF Buds Pro | anc, eq, spatial |
 | Donphan | CMF Buds | eq |
 | Espeon | CMF Buds Pro 2 | anc, eq, spatial |
-| Girafarig, Gligar, … | codename-модели | см. `internal/spp/spp.go` |
+| Girafarig, Gligar, … | codename models | see `internal/spp/spp.go` |
 
-Feature-команды в UI: `anc`, `eq`, `spatial`, `lag`, `dual` — с учётом capability конкретной модели.
+Feature commands in the UI: `anc`, `eq`, `spatial`, `lag`, `dual` - gated by each model’s capabilities.
 
-## Интерфейсы
+## Interfaces
 
 ### TUI
 
-Вкладки **Devices** (discovery, bind, connect), **Control** (GET/SET, toggles для lag/spatial/dual), **Log** (история пакетов, экспорт). Клавиши и подсказки — в нижней строке UI.
+Tabs: **Devices** (discovery, bind, connect), **Control** (GET/SET, toggles for lag/spatial/dual), **Log** (packet history, export). Keys and hints are shown in the bottom status line.
 
-Валидированные UI SET-команды (ANC/EQ/spatial/lag/dual) доступны из Control без `--unsafe`. Raw scan доступен только с `--unsafe` и требует **двойного Enter**.
+Validated UI SET commands (ANC/EQ/spatial/lag/dual) are available from Control without `--unsafe`. Raw scan requires `--unsafe` and **double Enter** confirmation.
 
 ### Gio GUI
 
-Сборка: `make run-gio` или `go run -tags "gio systray" ./cmd/tws_manager_gio`. Sidebar: устройства, control, log. По умолчанию включены `--auto`, `--notify` и `--privilege-helper=auto`; если polkit helper не установлен, GUI запросит sudo-пароль в окне.
+Build: `make run-gio` or `go run -tags "gio systray" ./cmd/tws_manager_gio`. Sidebar: devices, control, log. Defaults: `--auto`, `--notify`, and `--privilege-helper=auto`; if the polkit helper is not installed, the GUI prompts for the sudo password in-window.
 
 ### System tray
 
-Меню: статус, батарея, refresh, reconnect, disconnect, quit. На GNOME может понадобиться расширение AppIndicator.
+Menu: status, battery, refresh, reconnect, disconnect, quit. On GNOME you may need an AppIndicator extension.
 
-## Автозапуск и rootless
+## Autostart and rootless
 
-- Для desktop-автозапуска используется XDG entry: `packaging/common/tws_manager-autostart.desktop`.
-- GUI-поток по умолчанию использует `--privilege-helper=auto`: сначала polkit helper, затем sudo fallback с запросом пароля в окне.
-- Rootless режим предполагает policy/rules и helper:
+- Desktop autostart uses the XDG entry: `packaging/common/tws_manager-autostart.desktop`.
+- The GUI defaults to `--privilege-helper=auto`: polkit helper first, then sudo fallback with an in-window password prompt.
+- Rootless mode expects policy/rules and the helper:
   - `packaging/common/org.tws_manager.rfcomm.policy`
   - `packaging/common/90-tws_manager.rules`
   - `cmd/tws_manager_rfcomm_helper`
-- Пользователь должен быть в группе `tws_manager` (после добавления в группу обычно нужен logout/login).
+- The user must be in the `tws_manager` group (after adding the group, log out and back in).
 
-## Безопасность
+## Security
 
-- По умолчанию — **GET + валидированные UI SET** (ANC/EQ/spatial/lag/dual). Подробности: [SECURITY.md](SECURITY.md).
-- `--unsafe` — не-UI SET и ограниченный raw scan (`0xC0xx`, delay ≥ 200 ms, max 32 команды).
-- Опасные команды каталога (factory reset, debug mode) **заблокированы всегда**, даже с `--unsafe`.
-- `polkit` helper — рекомендуемый режим для GUI/autostart; `sudo` остаётся fallback-режимом.
-- Raw bytes в логах — только с `--log-raw`.
+- Default: **GET + validated UI SET** (ANC/EQ/spatial/lag/dual). Details: [SECURITY.md](SECURITY.md).
+- `--unsafe` - non-UI SET and limited raw scan (`0xC0xx`, delay ≥ 200 ms, max 32 commands).
+- Dangerous catalog commands (factory reset, debug mode) are **always blocked**, even with `--unsafe`.
+- `polkit` helper is the recommended mode for GUI/autostart; `sudo` remains a fallback.
+- Raw bytes in logs only with `--log-raw`.
 
-## Open Source Readiness
+## Open source readiness
 
-- Публичный репозиторий содержит только исходный код проекта и материалы документации.
-- Для сверки протокола используйте собственные логи и результаты наблюдений; не включайте в PR чужой исходный код.
-- Лицензия проекта: [LICENSE](LICENSE) (MIT).
+- The public repository contains only project source code and documentation.
+- For protocol verification, use your own logs and observations; do not include third-party source code in PRs.
+- Project license: [LICENSE](LICENSE) (MIT).
 
-## Пакетирование
+## Packaging
 
-Готовые packaging-артефакты лежат в `packaging/`:
+Packaging artifacts live under `packaging/`:
 
-- `packaging/debian` — debian control/rules/install scripts
-- `packaging/arch/PKGBUILD` — Arch/Manjaro package recipe
-- `packaging/fedora/tws_manager.spec` — Fedora RPM spec
-- `packaging/common` — общие desktop/polkit/sysusers файлы
+- `packaging/debian` - Debian control/rules/install scripts
+- `packaging/arch/PKGBUILD` - Arch/Manjaro package recipe
+- `packaging/fedora/tws_manager.spec` - Fedora RPM spec
+- `packaging/common` - shared desktop/polkit/sysusers files
 
-Вспомогательные цели:
+Helper targets:
 
 ```bash
 make build-helper
@@ -185,46 +191,46 @@ make package-rpm
 
 ### Post-install (rootless)
 
-- **Debian/Ubuntu (`.deb`)**: `postinst` пытается автоматически создать группу `tws_manager` и добавить пользователя. Если не удалось, выводит ручную команду `usermod`.
-- **Arch/Manjaro**: выводится post-install подсказка; выполните `sudo usermod -aG tws_manager $USER`, затем перелогиньтесь.
-- **Fedora/RPM**: создаётся группа через `sysusers`, а `post` выводит инструкции по добавлению пользователя в `tws_manager`.
+- **Debian/Ubuntu (`.deb`)**: `postinst` tries to create the `tws_manager` group and add the user automatically. On failure, it prints the manual `usermod` command.
+- **Arch/Manjaro**: post-install hint; run `sudo usermod -aG tws_manager $USER`, then log out and back in.
+- **Fedora/RPM**: group is created via `sysusers`; `%post` prints instructions to add the user to `tws_manager`.
 
-## Структура проекта
+## Project layout
 
 ```
 cmd/tws_manager/          TUI entrypoint
 cmd/tws_manager_gio/      Gio GUI entrypoint (-tags gio)
 cmd/tws_manager_rfcomm_helper/ privileged helper for polkit
 internal/
-  app/                    флаги, bootstrap, shutdown
-  session/                RFCOMM-сессия, read loop, probe
-  spp/                    wire-формат, команды, парсеры, модели
+  app/                    flags, bootstrap, shutdown
+  session/                RFCOMM session, read loop, probe
+  spp/                    wire format, commands, parsers, models
   bt/                     bluetoothctl, rfcomm, discovery
   connect/                autodiscover, bind, reconnect
   notify/                 desktop notifications
-  trace/                  NDJSON лог, redaction
-  security/               валидация MAC, путей, канала
+  trace/                  NDJSON log, redaction
+  security/               MAC, path, channel validation
   ui/tui/                 Bubble Tea
   ui/gio/                 Gio GUI
   ui/tray/                system tray
-  ui/presenter/           общий каталог команд для TUI/Gio
+  ui/presenter/           shared command catalog for TUI/Gio
 ```
 
-Карта для агентов и инварианты: [AGENTS.md](AGENTS.md).
+Agent map and invariants: [AGENTS.md](AGENTS.md).
 
-## Разработка
+## Development
 
 ```bash
-go test ./...                              # все тесты
-go test ./internal/spp -run Test           # протокол
-go test ./internal/session -run Test         # сессия
-gofmt -w cmd internal && make test         # форматирование + тесты
+go test ./...                              # all tests
+go test ./internal/spp -run Test           # protocol
+go test ./internal/session -run Test       # session
+gofmt -w cmd internal && make test         # format + tests
 ```
 
-После изменений в `cmd/` или `internal/` имеет смысл прогнать полный тестовый набор перед коммитом.
+After changes under `cmd/` or `internal/`, run the full test suite before committing.
 
-## Ограничения
+## Limitations
 
-- **Только Linux** (зависимость от BlueZ и `/dev/rfcommN`).
-- Не замена официального приложения: OTA, find-my, персонализация жестов и часть фич не реализованы.
-- Протокол восстановлен по наблюдаемому трафику и поведению устройств; поведение на непроверенных моделях может отличаться.
+- **Linux only** (depends on BlueZ and `/dev/rfcommN`).
+- Not a replacement for the official app: OTA, find-my, gesture customization, and some features are not implemented.
+- Protocol behavior is reconstructed from observed traffic; unverified models may differ.

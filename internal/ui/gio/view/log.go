@@ -134,7 +134,7 @@ func logCard(gtx layout.Context, th *material.Theme, title string, body layout.W
 
 func recentList(gtx layout.Context, th *material.Theme, list *widget.List, events []trace.Event, format func(trace.Event) string, c color.NRGBA) layout.Dimensions {
 	if len(events) == 0 {
-		lbl := material.Body2(th, "—")
+		lbl := material.Body2(th, "-")
 		lbl.Color = theme.FgMuted
 		return lbl.Layout(gtx)
 	}
@@ -172,7 +172,7 @@ func rawHexPanel(gtx layout.Context, th *material.Theme, s *state.State, snap st
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				rows := rawPairRows(th, snap.RawPackets)
 				if len(rows) == 0 {
-					lbl := material.Body2(th, "—")
+					lbl := material.Body2(th, "-")
 					lbl.Color = theme.FgMuted
 					return lbl.Layout(gtx)
 				}
@@ -220,7 +220,7 @@ func rawPacketRow(th *material.Theme, ev trace.Event) layout.Widget {
 	}
 	raw := ev.RawHex
 	if raw == "" {
-		raw = "—"
+		raw = "-"
 	}
 	return func(gtx layout.Context) layout.Dimensions {
 		head := material.Body2(th, fmt.Sprintf("%s  %s  %s", label, ev.Time, cmd))
@@ -264,7 +264,7 @@ func rawLineFor(logRaw bool) func(trace.Event) string {
 		}
 		raw := ev.RawHex
 		if raw == "" {
-			raw = "—"
+			raw = "-"
 		}
 		return fmt.Sprintf("%s %s\n%s", rawLabel(ev.Direction), ev.Time, raw)
 	}

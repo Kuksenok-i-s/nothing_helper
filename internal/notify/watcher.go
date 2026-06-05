@@ -22,15 +22,15 @@ type lowLevel struct {
 // Ordered high → low so a single pass picks the lowest threshold crossed.
 var earbudLowLevels = []lowLevel{
 	{percent: 20, urgency: UrgencyNormal, title: "Battery low", bodyFmt: "%s at %d%%"},
-	{percent: 10, urgency: UrgencyCritical, title: "Charge required", bodyFmt: "%s at %d%% — please charge"},
-	{percent: 5, urgency: UrgencyCritical, title: "Battery critical", bodyFmt: "%s at %d%% — about 3-5 minutes left, charge now"},
+	{percent: 10, urgency: UrgencyCritical, title: "Charge required", bodyFmt: "%s at %d%% - please charge"},
+	{percent: 5, urgency: UrgencyCritical, title: "Battery critical", bodyFmt: "%s at %d%% - about 3-5 minutes left, charge now"},
 }
 
 // caseLowLevels are the thresholds for the charging case (less urgent than the
 // earbuds, which are the part actually in use).
 var caseLowLevels = []lowLevel{
 	{percent: 20, urgency: UrgencyNormal, title: "Case battery low", bodyFmt: "%s at %d%%"},
-	{percent: 10, urgency: UrgencyCritical, title: "Charge the case", bodyFmt: "%s at %d%% — charge the case soon"},
+	{percent: 10, urgency: UrgencyCritical, title: "Charge the case", bodyFmt: "%s at %d%% - charge the case soon"},
 }
 
 // Options configures the notification watcher.

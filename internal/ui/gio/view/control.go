@@ -204,7 +204,7 @@ func commandColumn(gtx layout.Context, th *material.Theme, s *state.State, snap 
 // commandListBody renders just the scrollable list of command buttons (no header).
 func commandListBody(gtx layout.Context, th *material.Theme, s *state.State, snap state.Snapshot, indices []int, list *widget.List, variant widgets.Variant) layout.Dimensions {
 	if len(indices) == 0 {
-		lbl := material.Body2(th, "—")
+		lbl := material.Body2(th, "-")
 		lbl.Color = theme.FgMuted
 		return lbl.Layout(gtx)
 	}
@@ -244,10 +244,10 @@ func buildStatusRows(th *material.Theme, s *state.State, snap state.Snapshot) []
 		connColor = theme.Success
 	}
 
-	device := firstNonEmpty(sess.Device.Name, sess.Device.MAC, "—")
+	device := firstNonEmpty(sess.Device.Name, sess.Device.MAC, "-")
 	model := firstNonEmpty(sess.Model.Product, sess.Model.Codename, "unknown")
 
-	channel := "—"
+	channel := "-"
 	if sess.Device.Channel > 0 {
 		channel = fmt.Sprintf("%d", sess.Device.Channel)
 	}
@@ -263,7 +263,7 @@ func buildStatusRows(th *material.Theme, s *state.State, snap state.Snapshot) []
 
 	rows = append(rows, divider(), sectionHeader(th, "Status"))
 	if !sess.Connected {
-		rows = append(rows, hintRow(th, "Device disconnected — use Auto-connect above to reconnect."))
+		rows = append(rows, hintRow(th, "Device disconnected - use Auto-connect above to reconnect."))
 	}
 	rows = append(rows,
 		kvRowColor(th, "Connection", conn, connColor),
@@ -343,7 +343,7 @@ func configRows(th *material.Theme, config map[string]string) []layout.Widget {
 			any = true
 			rows = append(rows, kvRow(th, it.label, v))
 		} else {
-			rows = append(rows, kvRow(th, it.label, "—"))
+			rows = append(rows, kvRow(th, it.label, "-"))
 		}
 	}
 	if !any {
@@ -369,7 +369,7 @@ func dualDeviceRow(th *material.Theme, s *state.State, idx int, dev spp.DualDevi
 		if dev.Owner {
 			stateText += " · owner"
 		}
-		name := firstNonEmpty(dev.Name, dev.MAC, "—")
+		name := firstNonEmpty(dev.Name, dev.MAC, "-")
 
 		return layout.Inset{Top: theme.GapXS, Bottom: theme.GapXS}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
@@ -475,7 +475,7 @@ func divider() layout.Widget {
 
 func orDash(s string) string {
 	if strings.TrimSpace(s) == "" {
-		return "—"
+		return "-"
 	}
 	return s
 }

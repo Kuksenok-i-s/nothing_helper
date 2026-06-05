@@ -25,7 +25,7 @@ type ListItem struct {
 // SelectList renders selectable list rows.
 func SelectList(gtx layout.Context, th *material.Theme, items []ListItem, onSelect func(int)) layout.Dimensions {
 	if len(items) == 0 {
-		lbl := material.Body2(th, "No devices found — run Discover.")
+		lbl := material.Body2(th, "No devices found - run Discover.")
 		lbl.Color = theme.FgMuted
 		return lbl.Layout(gtx)
 	}

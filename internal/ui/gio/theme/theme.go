@@ -23,7 +23,7 @@ const (
 	MaxCmdBtns = 12
 )
 
-// Colors — dark minimal palette.
+// Colors - dark minimal palette.
 var (
 	Bg         = color.NRGBA{R: 0x0E, G: 0x0E, B: 0x0E, A: 0xFF}
 	Surface    = color.NRGBA{R: 0x18, G: 0x18, B: 0x18, A: 0xFF}

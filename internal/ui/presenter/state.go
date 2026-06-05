@@ -103,14 +103,14 @@ func disconnectStatus(device bt.Device, autoReconnect bool) string {
 	}
 	if autoReconnect {
 		if name != "" {
-			return fmt.Sprintf("disconnected from %s — reconnecting…", name)
+			return fmt.Sprintf("disconnected from %s - reconnecting…", name)
 		}
-		return "disconnected — reconnecting…"
+		return "disconnected - reconnecting…"
 	}
 	if name != "" {
-		return fmt.Sprintf("disconnected from %s — tap Auto-connect", name)
+		return fmt.Sprintf("disconnected from %s - tap Auto-connect", name)
 	}
-	return "disconnected — tap Auto-connect"
+	return "disconnected - tap Auto-connect"
 }
 
 // LogText returns joined log lines for display.

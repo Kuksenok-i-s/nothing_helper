@@ -1,6 +1,6 @@
 # AGENTS: tws_manager
 
-Этот файл — быстрый справочник для агентной работы по Go-части проекта.
+Этот файл - быстрый справочник для агентной работы по Go-части проекта.
 
 ## 1) Что это за проект
 
@@ -12,8 +12,8 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
 - логирование сессии в NDJSON + экспорт пакетов в JSON.
 
 Точки входа:
-- `cmd/tws_manager/main.go` — TUI (Bubble Tea);
-- `cmd/tws_manager_gio/main.go` — Gio GUI (`-tags gio`, нужен `vulkan-headers` на Linux).
+- `cmd/tws_manager/main.go` - TUI (Bubble Tea);
+- `cmd/tws_manager_gio/main.go` - Gio GUI (`-tags gio`, нужен `vulkan-headers` на Linux).
 
 ## 2) Карта Go-пакетов
 
@@ -32,7 +32,7 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
 
 - `internal/connect`
  - UI-friendly discover/bind/connect без stdin;
- - `AutoConnect`/`ConnectBest`/`BestCandidate` — автодискавери и reconnect-on-loss.
+ - `AutoConnect`/`ConnectBest`/`BestCandidate` - автодискавери и reconnect-on-loss.
 
 - `internal/notify`
  - desktop-уведомления (GNOME/freedesktop) через `gdbus`/`notify-send`, no-op без них;
@@ -105,7 +105,7 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
   - только `0xC0xx` GET команды;
   - `delay >= 200ms`;
   - максимум 32 команды.
-- Повторный connect к уже подключенному тому же MAC — idempotent no-op.
+- Повторный connect к уже подключенному тому же MAC - idempotent no-op.
 - По умолчанию raw bytes не должны попадать в экспорт/логи без `--log-raw`.
 - Для моделей со stereo source батареи применяется mapping `stereo -> case`.
 
