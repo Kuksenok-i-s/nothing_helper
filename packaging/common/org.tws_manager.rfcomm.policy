@@ -3,7 +3,7 @@
   "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
 <policyconfig>
   <vendor>tws_manager</vendor>
-  <vendor_url>https://example.invalid/tws_manager</vendor_url>
+  <vendor_url>https://github.com/Kuksenok-i-s/nothing_helper</vendor_url>
 
   <action id="org.tws_manager.rfcomm.manage">
     <description>Manage RFCOMM device nodes for tws_manager</description>

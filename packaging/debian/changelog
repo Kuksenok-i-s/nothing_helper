@@ -4,4 +4,4 @@ tws_manager (0.1.0-1) unstable; urgency=medium
   * Improve postinst: reliably create group and add likely desktop user,
     with explicit manual fallback instructions.
 
- -- tws_manager maintainers <maintainers@example.com>  Fri, 05 Jun 2026 17:33:00 +0300
+ -- tws_manager maintainers <kuksyenok.i.s@gmail.com>  Fri, 05 Jun 2026 17:33:00 +0300

@@ -3,7 +3,7 @@ Version:        0.1.0
 Release:        1%{?dist}
 Summary:        TWS RFCOMM desktop client
 License:        MIT
-URL:            https://github.com/example/tws_manager
+URL:            https://github.com/Kuksenok-i-s/nothing_helper
 Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  golang
@@ -63,5 +63,5 @@ echo "Then log out and log back in."
 %doc SECURITY.md
 
 %changelog
-* Fri Jun 05 2026 tws_manager maintainers <maintainers@example.com> - 0.1.0-1
+* Fri Jun 05 2026 tws_manager maintainers <kuksyenok.i.s@gmail.com> - 0.1.0-1
 - Initial package with rootless polkit helper and desktop autostart.
