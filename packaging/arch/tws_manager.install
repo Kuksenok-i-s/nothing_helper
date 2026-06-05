@@ -1,0 +1,14 @@
+post_install() {
+  _tws_manager_post_message
+}
+
+post_upgrade() {
+  _tws_manager_post_message
+}
+
+_tws_manager_post_message() {
+  echo "==> tws_manager: rootless mode uses group 'tws_manager' with polkit."
+  echo "==> Add your user to the group:"
+  echo "==>   sudo usermod -aG tws_manager \$USER"
+  echo "==> Then log out and log back in."
+}

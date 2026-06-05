@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE=1
+export GOFLAGS=
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	go build -o bin/tws_manager ./cmd/tws_manager
+	go build -tags "gio systray" -o bin/tws_manager_gio ./cmd/tws_manager_gio
+	go build -o bin/tws_manager_rfcomm_helper ./cmd/tws_manager_rfcomm_helper
+
+override_dh_auto_test:
+	go test ./...

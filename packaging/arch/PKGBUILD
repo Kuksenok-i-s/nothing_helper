@@ -1,0 +1,34 @@
+pkgname=tws_manager
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="TWS RFCOMM desktop client with tray and autoconnect"
+arch=('x86_64' 'aarch64')
+url="https://github.com/example/tws_manager"
+license=('MIT')
+install='tws_manager.install'
+depends=('bluez' 'bluez-utils' 'polkit' 'libnotify' 'libayatana-appindicator')
+makedepends=('go' 'pkgconf' 'gtk3' 'vulkan-headers')
+source=()
+sha256sums=()
+
+build() {
+  cd "${srcdir}/${pkgname}"
+  go build -o bin/tws_manager ./cmd/tws_manager
+  go build -tags "gio systray" -o bin/tws_manager_gio ./cmd/tws_manager_gio
+  go build -o bin/tws_manager_rfcomm_helper ./cmd/tws_manager_rfcomm_helper
+}
+
+package() {
+  cd "${srcdir}/${pkgname}"
+  install -Dm755 bin/tws_manager "${pkgdir}/usr/bin/tws_manager"
+  install -Dm755 bin/tws_manager_gio "${pkgdir}/usr/bin/tws_manager_gio"
+  install -Dm755 bin/tws_manager_rfcomm_helper "${pkgdir}/usr/libexec/tws_manager_rfcomm_helper"
+  install -Dm644 packaging/common/tws_manager.desktop "${pkgdir}/usr/share/applications/tws_manager.desktop"
+  install -Dm644 packaging/common/tws_manager-autostart.desktop "${pkgdir}/etc/xdg/autostart/tws_manager.desktop"
+  install -Dm644 packaging/common/tws_manager.svg "${pkgdir}/usr/share/icons/hicolor/scalable/apps/tws_manager.svg"
+  install -Dm644 packaging/common/org.tws_manager.rfcomm.policy "${pkgdir}/usr/share/polkit-1/actions/org.tws_manager.rfcomm.policy"
+  install -Dm644 packaging/common/90-tws_manager.rules "${pkgdir}/etc/polkit-1/rules.d/90-tws_manager.rules"
+  install -Dm644 packaging/common/tws_manager.sysusers "${pkgdir}/usr/lib/sysusers.d/tws_manager.conf"
+  install -Dm644 README.md "${pkgdir}/usr/share/doc/tws_manager/README.md"
+  install -Dm644 SECURITY.md "${pkgdir}/usr/share/doc/tws_manager/SECURITY.md"
+}

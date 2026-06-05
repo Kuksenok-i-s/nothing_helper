@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=tws_manager (Autostart)
+Comment=Autostart tws_manager on desktop login
+Exec=/usr/bin/tws_manager_gio --auto --notify --privilege-helper=polkit
+Icon=tws_manager
+Terminal=false
+Categories=AudioVideo;Utility;
+X-GNOME-Autostart-enabled=true

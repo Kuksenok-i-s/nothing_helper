@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>tws_manager</vendor>
+  <vendor_url>https://example.invalid/tws_manager</vendor_url>
+
+  <action id="org.tws_manager.rfcomm.manage">
+    <description>Manage RFCOMM device nodes for tws_manager</description>
+    <message>Authentication is required to manage RFCOMM nodes</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/tws_manager_rfcomm_helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">bind</annotate>
+  </action>
+
+  <action id="org.tws_manager.rfcomm.manage-release">
+    <description>Release RFCOMM device nodes for tws_manager</description>
+    <message>Authentication is required to release RFCOMM nodes</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/tws_manager_rfcomm_helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">release</annotate>
+  </action>
+
+  <action id="org.tws_manager.rfcomm.manage-fix-perms">
+    <description>Adjust RFCOMM node ownership for tws_manager</description>
+    <message>Authentication is required to adjust RFCOMM node ownership</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/tws_manager_rfcomm_helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">fix-perms</annotate>
+  </action>
+</policyconfig>

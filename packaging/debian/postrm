@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "purge" ]; then
+    echo "tws_manager removed; group tws_manager was left intact."
+fi
+
+exit 0

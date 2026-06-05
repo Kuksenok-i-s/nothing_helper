@@ -1,0 +1,76 @@
+#!/bin/sh
+set -e
+
+ensure_group() {
+    if command -v systemd-sysusers >/dev/null 2>&1; then
+        systemd-sysusers /usr/lib/sysusers.d/tws_manager.sysusers || true
+    fi
+
+    if getent group tws_manager >/dev/null 2>&1; then
+        return 0
+    fi
+    if command -v addgroup >/dev/null 2>&1; then
+        addgroup --system tws_manager || true
+        return 0
+    fi
+    if command -v groupadd >/dev/null 2>&1; then
+        groupadd --system tws_manager || true
+    fi
+}
+
+pick_target_user() {
+    if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+        echo "$SUDO_USER"
+        return 0
+    fi
+    if command -v logname >/dev/null 2>&1; then
+        _logname="$(logname 2>/dev/null || true)"
+        if [ -n "$_logname" ] && [ "$_logname" != "root" ]; then
+            echo "$_logname"
+            return 0
+        fi
+    fi
+    awk -F: '$3 >= 1000 && $3 < 65534 && $1 != "nobody" { print $1; exit }' /etc/passwd
+}
+
+add_user_to_group() {
+    _user="$1"
+    if [ -z "$_user" ] || [ "$_user" = "root" ]; then
+        return 1
+    fi
+    if ! id "$_user" >/dev/null 2>&1; then
+        return 1
+    fi
+    case " $(id -nG "$_user" 2>/dev/null) " in
+        *" tws_manager "*)
+            return 0
+            ;;
+    esac
+    if command -v usermod >/dev/null 2>&1; then
+        usermod -a -G tws_manager "$_user" >/dev/null 2>&1 || return 1
+        return 0
+    fi
+    if command -v adduser >/dev/null 2>&1; then
+        adduser "$_user" tws_manager >/dev/null 2>&1 || return 1
+        return 0
+    fi
+    return 1
+}
+
+case "$1" in
+    configure)
+        ensure_group
+        TARGET_USER="$(pick_target_user)"
+        if add_user_to_group "$TARGET_USER"; then
+            echo "Added user '${TARGET_USER}' to group 'tws_manager'."
+            echo "Please log out and log back in to apply new group membership."
+        else
+            echo "Could not automatically add a desktop user to group 'tws_manager'."
+            echo "Run manually (replace USERNAME):"
+            echo "  sudo usermod -aG tws_manager USERNAME"
+            echo "Then log out and log back in."
+        fi
+        ;;
+esac
+
+exit 0

@@ -1,0 +1,11 @@
+bin/tws_manager usr/bin/
+bin/tws_manager_gio usr/bin/
+bin/tws_manager_rfcomm_helper usr/libexec/
+packaging/common/tws_manager.desktop usr/share/applications/
+packaging/common/tws_manager-autostart.desktop etc/xdg/autostart/
+packaging/common/tws_manager.svg usr/share/icons/hicolor/scalable/apps/
+packaging/common/org.tws_manager.rfcomm.policy usr/share/polkit-1/actions/
+packaging/common/90-tws_manager.rules etc/polkit-1/rules.d/
+packaging/common/tws_manager.sysusers usr/lib/sysusers.d/
+README.md usr/share/doc/tws_manager/
+SECURITY.md usr/share/doc/tws_manager/
