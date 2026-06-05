@@ -8,18 +8,24 @@ license=('MIT')
 install='tws_manager.install'
 depends=('bluez' 'bluez-utils' 'polkit' 'libnotify' 'libayatana-appindicator')
 makedepends=('go' 'pkgconf' 'gtk3' 'vulkan-headers')
+options=('!strip')
 source=()
 sha256sums=()
 
+# PKGBUILD lives in packaging/arch/; repository root is two levels up.
+_rootdir="${startdir}/../.."
+
 build() {
-  cd "${srcdir}/${pkgname}"
+  cd "${_rootdir}"
+  export CGO_ENABLED=1
+  export GOFLAGS="-buildmode=pie -trimpath -ldflags=-linkmode=external -mod=readonly"
   go build -o bin/tws_manager ./cmd/tws_manager
   go build -tags "gio systray" -o bin/tws_manager_gio ./cmd/tws_manager_gio
   go build -o bin/tws_manager_rfcomm_helper ./cmd/tws_manager_rfcomm_helper
 }
 
 package() {
-  cd "${srcdir}/${pkgname}"
+  cd "${_rootdir}"
   install -Dm755 bin/tws_manager "${pkgdir}/usr/bin/tws_manager"
   install -Dm755 bin/tws_manager_gio "${pkgdir}/usr/bin/tws_manager_gio"
   install -Dm755 bin/tws_manager_rfcomm_helper "${pkgdir}/usr/libexec/tws_manager_rfcomm_helper"

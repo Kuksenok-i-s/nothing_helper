@@ -101,8 +101,8 @@ build-gio-package: build-gio build-helper build
 package-deb: build-gio-package
 	dpkg-buildpackage -us -uc -b -d
 
-package-arch: build-gio-package
-	@echo "Use packaging/arch/PKGBUILD with makepkg in an Arch build environment."
+package-arch:
+	cd packaging/arch && makepkg -sf --noconfirm
 
 package-rpm: build-gio-package
 	rpmbuild -ba packaging/fedora/tws_manager.spec

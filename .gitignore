@@ -11,7 +11,6 @@
 .env.production/
 .socraticode.json
 .socraticodecontextartifacts.json
-jadx_out/
 docs/
 captures/
 bin/
@@ -23,4 +22,6 @@ dist/
 *.rpm
 *.pkg.tar.zst
 *.pkg.tar.xz
-*.pkg.tar.zst
+packaging/arch/pkg/
+packaging/arch/src/
+packaging/arch/*.pkg.tar.*
