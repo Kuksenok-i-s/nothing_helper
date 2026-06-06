@@ -11,6 +11,7 @@ import (
 	"tws_manager/internal/app"
 	"tws_manager/internal/bt"
 	"tws_manager/internal/connect"
+	"tws_manager/internal/dualpolicy"
 	"tws_manager/internal/notify"
 	"tws_manager/internal/ui/tray"
 	"tws_manager/internal/ui/tui"
@@ -31,6 +32,7 @@ func main() {
 	notifyEnabled := flag.Bool("notify", false, "show desktop notifications for battery/connection events")
 	privilegeHelper := flag.String("privilege-helper", "sudo", "privilege backend for rfcomm operations: sudo|polkit|auto|none")
 	privilegeHelperPath := flag.String("privilege-helper-path", "", "optional absolute path to polkit helper binary")
+	pcPrimary := flag.String("pc-primary", "ask", "dual PC-primary policy: ask|off")
 	flag.Parse()
 
 	cfg, err := app.ValidateFlags(*devicePath, *address, *channel, *captureDir, *tracePath)
@@ -46,6 +48,7 @@ func main() {
 	cfg.Notify = *notifyEnabled
 	cfg.PrivilegeMode = *privilegeHelper
 	cfg.PrivilegeHelperPath = *privilegeHelperPath
+	cfg.PCPrimary = *pcPrimary
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -56,6 +59,10 @@ func main() {
 }
 
 func run(ctx context.Context, rt *app.Runtime) error {
+	pcPrimaryMode, err := dualpolicy.ParseMode(rt.Config.PCPrimary)
+	if err != nil {
+		return err
+	}
 	if err := bt.ConfigurePrivileges(rt.Config.PrivilegeMode, rt.Config.PrivilegeHelperPath); err != nil {
 		return err
 	}
@@ -107,6 +114,7 @@ func run(ctx context.Context, rt *app.Runtime) error {
 		AllowUnsafe:  rt.Config.AllowUnsafe,
 		LogRaw:       rt.Config.LogRaw,
 		AutoDiscover: rt.Config.AutoDiscover,
+		PCPrimary:    pcPrimaryMode,
 		Ctx:          ctx,
 	})
 }

@@ -15,6 +15,7 @@ import (
 
 	"tws_manager/internal/bt"
 	"tws_manager/internal/connect"
+	"tws_manager/internal/dualpolicy"
 	"tws_manager/internal/session"
 	"tws_manager/internal/spp"
 	"tws_manager/internal/trace"
@@ -27,6 +28,7 @@ type Options struct {
 	AllowUnsafe  bool
 	LogRaw       bool
 	AutoDiscover bool
+	PCPrimary    dualpolicy.Mode
 	Ctx          context.Context
 }
 
@@ -43,6 +45,14 @@ type Model struct {
 	activeTab         int
 	commenting        bool
 	pendingUnsafeItem *presenter.Command
+	pcPrimaryMode     dualpolicy.Mode
+	hostMAC           string
+	hostMACLoaded     bool
+	hostMACErr        string
+	dualPending       spp.DualDevice
+	dualPendingOK     bool
+	dualPromptVisible bool
+	userInteracted    bool
 	styles            styles
 }
 
@@ -96,7 +106,8 @@ func New(s *session.Session, opts Options) Model {
 		log:       viewport.New(80, 16),
 		comment:   comment,
 		styles:    defaultStyles(),
-		activeTab: 0,
+		activeTab:     0,
+		pcPrimaryMode: opts.PCPrimary,
 	}
 }
 
@@ -143,6 +154,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if !m.commenting {
+			m.markUserInteraction()
+			if m.dualPromptVisible {
+				switch msg.String() {
+				case "y", "Y":
+					m.acceptDualPCPrimary()
+					return m, waitEventCmd(m.events)
+				case "n", "N":
+					m.declineDualPCPrimary()
+					return m, waitEventCmd(m.events)
+				}
+			}
+		}
 		switch msg.String() {
 		case "ctrl+c":
 			_ = m.session.Close()
@@ -233,6 +257,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) View() string {
 	snap := m.session.Snapshot()
 	header := m.styles.title.Render("tws_manager") + "  " + m.presenter.Status
+	if line := m.dualPromptLine(); line != "" {
+		header += "\n" + m.styles.warn.Render(line)
+	}
 	if m.presenter.Err != "" {
 		header += "  " + m.styles.warn.Render(m.presenter.Err)
 	}
@@ -293,9 +320,13 @@ func (m *Model) applyEvent(event session.Event) {
 	m.log.SetContent(m.presenter.LogText())
 	m.log.GotoBottom()
 	if event.Kind == session.EventDisconnected {
+		m.dualPendingOK = false
+		m.dualPromptVisible = false
+		m.userInteracted = false
 		m.commands.SetItems(commandListItems(spp.DefaultModel(), nil, m.options.AllowUnsafe))
 		return
 	}
+	m.evaluateDualPrompt(snap)
 	m.commands.SetItems(commandListItems(snap.Model, snap.DualList, m.options.AllowUnsafe))
 }
 

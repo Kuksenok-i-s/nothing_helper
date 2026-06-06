@@ -22,6 +22,7 @@ type Config struct {
 	QueryEvery          time.Duration
 	AutoDiscover        bool
 	Notify              bool
+	PCPrimary           string
 }
 
 // ValidateFlags normalizes and validates flag values.

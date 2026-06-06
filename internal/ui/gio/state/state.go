@@ -12,7 +12,9 @@ import (
 
 	"tws_manager/internal/bt"
 	"tws_manager/internal/connect"
+	"tws_manager/internal/dualpolicy"
 	"tws_manager/internal/session"
+	"tws_manager/internal/spp"
 	"tws_manager/internal/trace"
 	"tws_manager/internal/ui/gio/config"
 	"tws_manager/internal/ui/presenter"
@@ -75,6 +77,15 @@ type State struct {
 	sudoPrompt  string
 	sudoReply   chan sudoPasswordResult
 
+	pcPrimaryMode     dualpolicy.Mode
+	hostMAC           string
+	hostMACLoaded     bool
+	hostMACErr        string
+	dualPending       spp.DualDevice
+	dualPendingOK     bool
+	dualPromptVisible bool
+	userInteracted    bool
+
 	toggleBools   map[string]*widget.Bool
 	togglePending map[string]bool
 	toggleWant    map[string]bool
@@ -99,6 +110,8 @@ type State struct {
 	SudoPassword   widget.Editor
 	SudoSubmit     widget.Clickable
 	SudoCancel     widget.Clickable
+	DualAcceptBtn  widget.Clickable
+	DualDeclineBtn widget.Clickable
 	TabDevices     widget.Clickable
 	TabControl     widget.Clickable
 	TabLog         widget.Clickable
@@ -119,7 +132,9 @@ type Snapshot struct {
 	Packets    int
 	Recent     []trace.Event
 	RawPackets []trace.Event
-	SudoPrompt string
+	SudoPrompt      string
+	DualPrompt      string
+	DualPromptShown bool
 }
 
 type sudoPasswordResult struct {
@@ -141,6 +156,7 @@ func New(ctx context.Context, w *app.Window, opts config.Options, sess *session.
 		captureDir:    opts.CaptureDir,
 		logRaw:        opts.LogRaw,
 		activeTab:     TabControl,
+		pcPrimaryMode: opts.PCPrimary,
 	}
 	s.presenter.AutoReconnect = opts.AutoConnect
 	s.SudoPassword.SingleLine = true
@@ -225,7 +241,14 @@ func (s *State) Snapshot() Snapshot {
 		Packets:    len(s.presenter.LastEvents),
 		Recent:     recentEvents(s.presenter.LastEvents, 3),
 		RawPackets: chronologicalEvents(s.presenter.LastEvents, 16),
-		SudoPrompt: s.sudoPrompt,
+		SudoPrompt:      s.sudoPrompt,
+		DualPromptShown: s.dualPromptVisible && s.dualPendingOK,
+		DualPrompt: func() string {
+			if !s.dualPromptVisible || !s.dualPendingOK {
+				return ""
+			}
+			return dualpolicy.PromptText(s.dualPending)
+		}(),
 	}
 }
 

@@ -3,6 +3,7 @@
 package view
 
 import (
+	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -14,6 +15,16 @@ import (
 
 // Layout renders the full application shell.
 func Layout(gtx layout.Context, th *material.Theme, s *state.State) layout.Dimensions {
+	for {
+		ev, ok := gtx.Event(pointer.Filter{Kinds: pointer.Press})
+		if !ok {
+			break
+		}
+		if pe, ok := ev.(pointer.Event); ok && pe.Kind == pointer.Press {
+			s.MarkUserInteraction()
+		}
+	}
+
 	widgets.FillBackground(gtx, theme.Bg)
 	snap := s.Snapshot()
 
@@ -35,6 +46,12 @@ func Layout(gtx layout.Context, th *material.Theme, s *state.State) layout.Dimen
 							return layout.Dimensions{}
 						}
 						return sudoPasswordPrompt(gtx, th, s, snap.SudoPrompt)
+					}),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						if !snap.DualPromptShown || snap.DualPrompt == "" {
+							return layout.Dimensions{}
+						}
+						return dualSwitchPrompt(gtx, th, s, snap.DualPrompt)
 					}),
 					layout.Rigid(layout.Spacer{Height: theme.GapMD}.Layout),
 					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
@@ -85,6 +102,43 @@ func sudoPasswordPrompt(gtx layout.Context, th *material.Theme, s *state.State, 
 								dims, clicked := widgets.Button(gtx, th, &s.SudoCancel, "Cancel", widgets.VariantGhost)
 								if clicked {
 									s.CancelSudoPassword()
+								}
+								return dims
+							},
+						)
+					}),
+				)
+			})
+		})
+	})
+}
+
+func dualSwitchPrompt(gtx layout.Context, th *material.Theme, s *state.State, prompt string) layout.Dimensions {
+	return layout.Inset{Top: theme.GapMD}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return widgets.Card(gtx, theme.SurfaceAlt, func(gtx layout.Context) layout.Dimensions {
+			return layout.Inset{Top: theme.GapSM, Bottom: theme.GapSM, Left: theme.GapSM, Right: theme.GapSM}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				title := material.Body1(th, "Dual connection")
+				title.Color = theme.Fg
+				body := material.Body2(th, prompt)
+				body.Color = theme.FgMuted
+				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+					layout.Rigid(title.Layout),
+					layout.Rigid(layout.Spacer{Height: theme.GapXS}.Layout),
+					layout.Rigid(body.Layout),
+					layout.Rigid(layout.Spacer{Height: theme.GapSM}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						return widgets.Row(gtx, th,
+							func(gtx layout.Context) layout.Dimensions {
+								dims, clicked := widgets.Button(gtx, th, &s.DualAcceptBtn, "Switch to PC", widgets.VariantPrimary)
+								if clicked {
+									s.AcceptDualPCPrimary()
+								}
+								return dims
+							},
+							func(gtx layout.Context) layout.Dimensions {
+								dims, clicked := widgets.Button(gtx, th, &s.DualDeclineBtn, "Not now", widgets.VariantGhost)
+								if clicked {
+									s.DeclineDualPCPrimary()
 								}
 								return dims
 							},

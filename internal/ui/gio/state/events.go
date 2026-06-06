@@ -28,9 +28,11 @@ func (s *State) PumpEvents(ctx context.Context) {
 			s.presenter.ApplyEvent(event, snap)
 			if event.Kind == session.EventDisconnected {
 				s.resetOnDisconnectLocked()
+				s.clearDualPromptLocked()
 			} else {
 				s.commands = presenter.BuildCommands(snap.Model, snap.DualList, s.allowUnsafe)
 				s.syncCmdButtons()
+				s.evaluateDualPrompt(snap)
 			}
 			s.mu.Unlock()
 			s.invalidate()

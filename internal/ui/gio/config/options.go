@@ -5,6 +5,7 @@ package config
 import (
 	"tws_manager/internal/bt"
 	"tws_manager/internal/connect"
+	"tws_manager/internal/dualpolicy"
 )
 
 // Options configures the Gio window.
@@ -16,6 +17,7 @@ type Options struct {
 	AppName       string
 	AutoConnect   bool
 	InitialDevice bt.Device
+	PCPrimary     dualpolicy.Mode
 
 	// OnExit runs exactly once after the window event loop ends, just before the
 	// process terminates. On desktop app.Main never returns, so Run exits the
