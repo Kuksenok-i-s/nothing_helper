@@ -30,6 +30,25 @@ func TestIsRecoverableRFCOMMOpenError(t *testing.T) {
 	}
 }
 
+func TestDeviceConnectedFromInfo(t *testing.T) {
+	tests := []struct {
+		name string
+		info string
+		want bool
+	}{
+		{name: "connected yes", info: "Connected: yes\nAlias: Ear\n", want: true},
+		{name: "connected no", info: "Connected: no\n", want: false},
+		{name: "missing", info: "Alias: Ear\n", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := deviceConnectedFromInfo(tt.info); got != tt.want {
+				t.Fatalf("deviceConnectedFromInfo() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIsRFCOMMNotBoundError(t *testing.T) {
 	if !isRFCOMMNotBoundOutput("Can't release device: Not bound") {
 		t.Fatal("expected not bound output to be recognized")

@@ -1,6 +1,10 @@
 package bt
 
-import "testing"
+import (
+	"fmt"
+	"os"
+	"testing"
+)
 
 func TestParsePrivilegeMode(t *testing.T) {
 	tests := []struct {
@@ -36,6 +40,10 @@ func TestPolkitCommandArgs(t *testing.T) {
 	if got, want := bind[0], "bind"; got != want {
 		t.Fatalf("bind action=%q want %q", got, want)
 	}
+	wantOwner := fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())
+	if !containsArgPair(bind, "--owner", wantOwner) {
+		t.Fatalf("bind args=%v want --owner %q", bind, wantOwner)
+	}
 	release, err := polkitReleaseArgs("0")
 	if err != nil {
 		t.Fatalf("polkitReleaseArgs() err=%v", err)
@@ -50,4 +58,13 @@ func TestPolkitCommandArgs(t *testing.T) {
 	if got, want := fix[0], "fix-perms"; got != want {
 		t.Fatalf("fix action=%q want %q", got, want)
 	}
+}
+
+func containsArgPair(args []string, key, value string) bool {
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == key && args[i+1] == value {
+			return true
+		}
+	}
+	return false
 }

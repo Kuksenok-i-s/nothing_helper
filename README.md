@@ -148,13 +148,15 @@ Menu: status, battery, refresh, reconnect, disconnect, quit. On GNOME you may ne
 
 ## Autostart and rootless
 
-- Desktop autostart uses the XDG entry: `packaging/common/tws_manager-autostart.desktop`.
+- Desktop autostart uses the XDG entry: `packaging/common/tws_manager-autostart.desktop` (`--auto --notify --privilege-helper=polkit`).
 - The GUI defaults to `--privilege-helper=auto`: polkit helper first, then sudo fallback with an in-window password prompt.
 - Rootless mode expects policy/rules and the helper:
   - `packaging/common/org.tws_manager.rfcomm.policy`
   - `packaging/common/90-tws_manager.rules`
   - `cmd/tws_manager_rfcomm_helper`
-- The user must be in the `tws_manager` group (after adding the group, log out and back in).
+- The **`tws_manager` group is required** for autostart without a polkit password: the polkit rule allows bind/release/chown only for group members. Without the group, every bind via `pkexec` will prompt for the administrator password.
+- After `sudo usermod -aG tws_manager $USER`, a **full logout/login** is required (restarting only the GUI is not enough).
+- Verify: `groups | grep tws_manager`, then `pkexec /usr/libexec/tws_manager_rfcomm_helper bind --number 0 --addr <MAC> --channel 15 --owner $(id -u):$(id -g)` — no password dialog and `/dev/rfcomm0` should appear.
 
 ## Security
 
@@ -192,7 +194,7 @@ make package-rpm
 ### Post-install (rootless)
 
 - **Debian/Ubuntu (`.deb`)**: `postinst` tries to create the `tws_manager` group and add the user automatically. On failure, it prints the manual `usermod` command.
-- **Arch/Manjaro**: post-install hint; run `sudo usermod -aG tws_manager $USER`, then log out and back in.
+- **Arch/Manjaro**: the user is **not added to the group automatically** (unlike `.deb`). After installing the package, run `sudo usermod -aG tws_manager $USER` and log out and back in — otherwise autostart will prompt for a polkit password and will not create `/dev/rfcomm0` for the SPP session.
 - **Fedora/RPM**: group is created via `sysusers`; `%post` prints instructions to add the user to `tws_manager`.
 
 ## Project layout

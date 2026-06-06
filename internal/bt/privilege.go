@@ -145,7 +145,26 @@ func polkitBindArgs(num, mac string, channel int) ([]string, error) {
 	if num == "" || mac == "" {
 		return nil, fmt.Errorf("polkit bind requires rfcomm number and mac")
 	}
-	return []string{"bind", "--number", num, "--addr", mac, "--channel", strconv.Itoa(channel)}, nil
+	owner, err := polkitCallerOwner()
+	if err != nil {
+		return nil, err
+	}
+	return []string{
+		"bind",
+		"--number", num,
+		"--addr", mac,
+		"--channel", strconv.Itoa(channel),
+		"--owner", owner,
+	}, nil
+}
+
+func polkitCallerOwner() (string, error) {
+	uid := os.Getuid()
+	gid := os.Getgid()
+	if uid < 0 || gid < 0 {
+		return "", fmt.Errorf("polkit bind requires a valid caller uid:gid")
+	}
+	return fmt.Sprintf("%d:%d", uid, gid), nil
 }
 
 func polkitReleaseArgs(num string) ([]string, error) {

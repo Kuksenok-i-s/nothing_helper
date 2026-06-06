@@ -111,6 +111,28 @@ func BluetoothInfo(mac string) (string, error) {
 	return string(out), nil
 }
 
+// IsDeviceConnected reports whether bluetoothctl lists the device as Connected: yes.
+func IsDeviceConnected(mac string) (bool, error) {
+	info, err := BluetoothInfo(mac)
+	if err != nil {
+		return false, err
+	}
+	return deviceConnectedFromInfo(info), nil
+}
+
+func deviceConnectedFromInfo(info string) bool {
+	for _, line := range strings.Split(info, "\n") {
+		key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
+		if !ok {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(key), "Connected") {
+			return strings.EqualFold(strings.TrimSpace(value), "yes")
+		}
+	}
+	return false
+}
+
 func EnrichDeviceInfo(dev Device) Device {
 	if dev.MAC == "" {
 		return dev

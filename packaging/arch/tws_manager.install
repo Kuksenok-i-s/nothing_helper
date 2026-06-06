@@ -7,8 +7,10 @@ post_upgrade() {
 }
 
 _tws_manager_post_message() {
-  echo "==> tws_manager: rootless mode uses group 'tws_manager' with polkit."
-  echo "==> Add your user to the group:"
+  echo "==> tws_manager: autostart bind/release uses polkit helper without password"
+  echo "==> only for members of group 'tws_manager'."
+  echo "==> Required once after install (Arch does not add users automatically):"
   echo "==>   sudo usermod -aG tws_manager \$USER"
-  echo "==> Then log out and log back in."
+  echo "==> Then log out and log back in (full session restart)."
+  echo "==> Verify: groups | grep tws_manager"
 }
