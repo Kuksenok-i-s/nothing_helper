@@ -91,6 +91,30 @@ func TestDecodeProtocolVersionResponse(t *testing.T) {
 	}
 }
 
+func TestDecodePacketRejectsOversizedLength(t *testing.T) {
+	raw := []byte{SOF, 0x60, 0x01, 0x07, 0xC0, 0x10, 0x00, 0x01}
+	_, err := DecodePacket(raw)
+	if err == nil {
+		t.Fatal("DecodePacket() error = nil, want payload length error")
+	}
+}
+
+func TestReadPacketRejectsOversizedLength(t *testing.T) {
+	stream := bytes.NewReader([]byte{SOF, 0x60, 0x01, 0x07, 0xC0, 0x10, 0x00, 0x01})
+	_, err := ReadPacket(stream)
+	if err == nil {
+		t.Fatal("ReadPacket() error = nil, want payload length error")
+	}
+}
+
+func TestReadPacketSOFScanLimit(t *testing.T) {
+	garbage := bytes.Repeat([]byte{0x00}, maxSOFScanBytes+1)
+	_, err := ReadPacket(bytes.NewReader(garbage))
+	if err == nil {
+		t.Fatal("ReadPacket() error = nil, want SOF scan limit error")
+	}
+}
+
 func TestNextFSNSequence(t *testing.T) {
 	ResetFSN()
 	if got := NextFSN(); got != 1 {

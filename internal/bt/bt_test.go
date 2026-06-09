@@ -3,8 +3,11 @@ package bt
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"tws_manager/internal/security"
 )
@@ -27,6 +30,55 @@ func TestIsRecoverableRFCOMMOpenError(t *testing.T) {
 				t.Fatalf("isRecoverableRFCOMMOpenError(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestOpenFileWithTimeoutRegularFile(t *testing.T) {
+	tmp, err := os.CreateTemp(t.TempDir(), "rfcomm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := tmp.Name()
+	tmp.Close()
+
+	f, err := openFileWithTimeout(path, 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("openFileWithTimeout(%q) = %v", path, err)
+	}
+	defer f.Close()
+	if _, err := f.Write([]byte("ping")); err != nil {
+		t.Fatalf("write after open: %v", err)
+	}
+}
+
+func TestOpenFileWithTimeoutMissingPath(t *testing.T) {
+	_, err := openFileWithTimeout("/nonexistent/rfcomm99", 100*time.Millisecond)
+	if err == nil {
+		t.Fatal("expected error for missing path")
+	}
+	if !os.IsNotExist(err) {
+		t.Fatalf("expected not-exist error, got %v", err)
+	}
+}
+
+func TestRunCommandIncludesOutputInError(t *testing.T) {
+	_, err := runCommand("sh", "-c", "echo boom >&2; exit 3")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "boom") || !strings.Contains(msg, "sh -c") {
+		t.Fatalf("error should carry command line and output, got %q", msg)
+	}
+}
+
+func TestRunCommandSuccessReturnsOutput(t *testing.T) {
+	out, err := runCommand("sh", "-c", "echo ok")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(out)) != "ok" {
+		t.Fatalf("out = %q", out)
 	}
 }
 
@@ -90,6 +142,59 @@ func TestSanitizeConfig(t *testing.T) {
 	}
 	if cfg.Devices["/dev/rfcomm0"] != "AA:BB:CC:DD:EE:FF" {
 		t.Fatalf("mac = %q", cfg.Devices["/dev/rfcomm0"])
+	}
+}
+
+func TestShouldProbeNextChannel(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil", err: nil, want: false},
+		{name: "bind failed", err: wrapRFCOMMBind(fmt.Errorf("rfcomm bind 0")), want: true},
+		{name: "open failed", err: wrapRFCOMMOpen(fmt.Errorf(`open "/dev/rfcomm0" timed out`)), want: true},
+		{name: "permission", err: wrapRFCOMMPermission(syscall.EACCES), want: false},
+		{name: "invalid mac", err: fmt.Errorf("%w: bad mac", ErrInvalidBluetoothMAC), want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldProbeNextChannel(tt.err); got != tt.want {
+				t.Fatalf("shouldProbeNextChannel(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseBluetoothctlOutput(t *testing.T) {
+	fields := ParseBluetoothctlOutput("Device AA:BB:CC:DD:EE:FF\n\tName: Nothing Ear (a)\n\tAlias: Ear A\n\tConnected: yes\n")
+	if fields["name"] != "Nothing Ear (a)" {
+		t.Fatalf("name = %q", fields["name"])
+	}
+	if fields["alias"] != "Ear A" {
+		t.Fatalf("alias = %q", fields["alias"])
+	}
+	if fields["connected"] != "yes" {
+		t.Fatalf("connected = %q", fields["connected"])
+	}
+}
+
+func TestLoadConfigUsesCache(t *testing.T) {
+	path := t.TempDir() + "/devices.json"
+	if err := SaveConfig(path, Config{Devices: map[string]string{"/dev/rfcomm0": "AA:BB:CC:DD:EE:FF"}}); err != nil {
+		t.Fatal(err)
+	}
+	cfg1, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Remove(path)
+	cfg2, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg1.Devices["/dev/rfcomm0"] != cfg2.Devices["/dev/rfcomm0"] {
+		t.Fatalf("cached config mismatch: %+v vs %+v", cfg1, cfg2)
 	}
 }
 

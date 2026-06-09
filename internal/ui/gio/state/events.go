@@ -23,8 +23,8 @@ func (s *State) PumpEvents(ctx context.Context) {
 			if !ok {
 				return
 			}
-			s.mu.Lock()
 			snap := s.session.Snapshot()
+			s.mu.Lock()
 			s.presenter.ApplyEvent(event, snap)
 			if event.Kind == session.EventDisconnected {
 				s.resetOnDisconnectLocked()
@@ -40,24 +40,9 @@ func (s *State) PumpEvents(ctx context.Context) {
 	}
 }
 
-// RunCommand sends a presenter command through the session.
+// RunCommand enqueues a presenter command for async execution.
 func (s *State) RunCommand(cmd presenter.Command) {
-	if len(cmd.Fields) > 0 {
-		pkt, _, err := s.session.FeaturePacket(cmd.Fields)
-		if err != nil {
-			s.setErr(err.Error())
-			return
-		}
-		if err := s.session.Send(pkt, session.Meta{Source: "gio", Trigger: cmd.Title}); err != nil {
-			s.setErr(err.Error())
-			return
-		}
-		s.refreshFeatureAfterSet(cmd.Fields)
-		return
-	}
-	if err := s.session.SendCommand(cmd.Cmd, session.Meta{Source: "gio", Trigger: cmd.Title}); err != nil {
-		s.setErr(err.Error())
-	}
+	s.enqueueCommand(cmd)
 }
 
 // RunToggle sends the on/off SET for a feature switch and then re-reads the

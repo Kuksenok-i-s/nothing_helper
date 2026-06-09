@@ -3,7 +3,6 @@ package bt
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -187,11 +186,8 @@ func execPolkit(args ...string) error {
 		return fmt.Errorf("polkit helper not found (checked %s and %s)", defaultPolkitHelperPath, altPolkitHelperPath)
 	}
 	cmdArgs := append([]string{helperPath}, args...)
-	out, err := exec.Command("pkexec", cmdArgs...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("pkexec %s: %w: %s", strings.Join(cmdArgs, " "), err, strings.TrimSpace(string(out)))
-	}
-	return nil
+	_, err := runCommand("pkexec", cmdArgs...)
+	return err
 }
 
 func discoverPolkitHelperPath() string {

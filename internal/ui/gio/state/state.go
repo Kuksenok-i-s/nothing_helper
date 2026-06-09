@@ -12,11 +12,10 @@ import (
 
 	"tws_manager/internal/bt"
 	"tws_manager/internal/connect"
-	"tws_manager/internal/dualpolicy"
 	"tws_manager/internal/session"
-	"tws_manager/internal/spp"
 	"tws_manager/internal/trace"
 	"tws_manager/internal/ui/gio/config"
+	"tws_manager/internal/ui/dualprompt"
 	"tws_manager/internal/ui/presenter"
 )
 
@@ -77,14 +76,8 @@ type State struct {
 	sudoPrompt  string
 	sudoReply   chan sudoPasswordResult
 
-	pcPrimaryMode     dualpolicy.Mode
-	hostMAC           string
-	hostMACLoaded     bool
-	hostMACErr        string
-	dualPending       spp.DualDevice
-	dualPendingOK     bool
-	dualPromptVisible bool
-	userInteracted    bool
+	dualPrompt dualprompt.Controller
+	cmdQueue   chan presenter.Command
 
 	toggleBools   map[string]*widget.Bool
 	togglePending map[string]bool
@@ -156,8 +149,11 @@ func New(ctx context.Context, w *app.Window, opts config.Options, sess *session.
 		captureDir:    opts.CaptureDir,
 		logRaw:        opts.LogRaw,
 		activeTab:     TabControl,
-		pcPrimaryMode: opts.PCPrimary,
+		dualPrompt: dualprompt.Controller{Mode: opts.PCPrimary},
+		cmdQueue:   make(chan presenter.Command, 32),
 	}
+	go s.commandWorker()
+	go s.preloadHostMAC()
 	s.presenter.AutoReconnect = opts.AutoConnect
 	s.SudoPassword.SingleLine = true
 	s.SudoPassword.Submit = true
@@ -242,13 +238,8 @@ func (s *State) Snapshot() Snapshot {
 		Recent:     recentEvents(s.presenter.LastEvents, 3),
 		RawPackets: chronologicalEvents(s.presenter.LastEvents, 16),
 		SudoPrompt:      s.sudoPrompt,
-		DualPromptShown: s.dualPromptVisible && s.dualPendingOK,
-		DualPrompt: func() string {
-			if !s.dualPromptVisible || !s.dualPendingOK {
-				return ""
-			}
-			return dualpolicy.PromptText(s.dualPending)
-		}(),
+		DualPromptShown: s.dualPrompt.Visible && s.dualPrompt.PendingOK,
+		DualPrompt:      s.dualPrompt.PromptLine(),
 	}
 }
 

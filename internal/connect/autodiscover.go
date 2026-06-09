@@ -23,41 +23,6 @@ type AutoOptions struct {
 	OnStatus func(string)
 }
 
-// BestCandidate picks the most likely earbuds from a discovery result.
-//
-// Preference order: a connected device exposing the compatible SPP profile, then
-// any SPP device, then any connected device, then the first candidate.
-func BestCandidate(devices []bt.Device) (bt.Device, bool) {
-	var spp, connected, any *bt.Device
-	for i := range devices {
-		d := &devices[i]
-		if d.MAC == "" {
-			continue
-		}
-		if d.SPP && d.Connected {
-			return *d, true
-		}
-		if d.SPP && spp == nil {
-			spp = d
-		}
-		if d.Connected && connected == nil {
-			connected = d
-		}
-		if any == nil {
-			any = d
-		}
-	}
-	switch {
-	case spp != nil:
-		return *spp, true
-	case connected != nil:
-		return *connected, true
-	case any != nil:
-		return *any, true
-	}
-	return bt.Device{}, false
-}
-
 // BestConnectedCandidate picks the best compatible TWS device that is currently
 // connected at the Bluetooth layer. Used by auto-connect to avoid RFCOMM retries
 // while earbuds are in the case or powered off.
@@ -173,6 +138,9 @@ func (m *Manager) ConnectBest(ctx context.Context, status func(string)) error {
 	}
 	dev, ok := BestConnectedCandidate(devices)
 	if !ok {
+		if len(devices) == 0 {
+			return errNoCandidate
+		}
 		return errWaitingForBluetooth
 	}
 	if err := m.requireRFCOMMReady(dev.MAC); err != nil {

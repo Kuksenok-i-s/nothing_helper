@@ -8,6 +8,11 @@ import (
 const (
 	SOF = 0x55
 
+	// MaxPayloadLen is the largest accepted wire payload size (bytes).
+	MaxPayloadLen = 4096
+	// maxSOFScanBytes limits how many non-SOF bytes ReadPacket skips before failing.
+	maxSOFScanBytes = 65536
+
 	ControlCRC        = 0x20
 	ControlMultiFrame = 0x40
 	DeviceTypeTWS     = 1 << 8

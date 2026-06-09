@@ -19,6 +19,8 @@ import (
 	"tws_manager/internal/session"
 	"tws_manager/internal/spp"
 	"tws_manager/internal/trace"
+	"tws_manager/internal/ui/actions"
+	"tws_manager/internal/ui/dualprompt"
 	"tws_manager/internal/ui/presenter"
 )
 
@@ -45,14 +47,7 @@ type Model struct {
 	activeTab         int
 	commenting        bool
 	pendingUnsafeItem *presenter.Command
-	pcPrimaryMode     dualpolicy.Mode
-	hostMAC           string
-	hostMACLoaded     bool
-	hostMACErr        string
-	dualPending       spp.DualDevice
-	dualPendingOK     bool
-	dualPromptVisible bool
-	userInteracted    bool
+	dualPrompt dualprompt.Controller
 	styles            styles
 }
 
@@ -107,7 +102,7 @@ func New(s *session.Session, opts Options) Model {
 		comment:   comment,
 		styles:    defaultStyles(),
 		activeTab:     0,
-		pcPrimaryMode: opts.PCPrimary,
+		dualPrompt: dualprompt.Controller{Mode: opts.PCPrimary},
 	}
 }
 
@@ -156,7 +151,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if !m.commenting {
 			m.markUserInteraction()
-			if m.dualPromptVisible {
+			if m.dualPrompt.Visible {
 				switch msg.String() {
 				case "y", "Y":
 					m.acceptDualPCPrimary()
@@ -212,22 +207,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.pendingUnsafeItem = nil
 						return m, runScanCmd(m.options.Ctx, m.session, fields)
 					}
-					if presenter.NeedsUnsafeConfirmation(item.Command) {
-						if !item.Command.SafeSet && !m.options.AllowUnsafe {
-							m.presenter.Err = "this command requires --unsafe"
-							return m, nil
-						}
-						if item.Command.SafeSet {
-							return m, sendCommandCmd(m.session, item.Command, m.comment.Value())
-						}
-						if m.pendingUnsafeItem == nil || m.pendingUnsafeItem.Title != item.Command.Title {
-							m.pendingUnsafeItem = &item.Command
-							m.presenter.Status = fmt.Sprintf("Confirm unsafe command: press Enter again to run %q", item.Command.Title)
-							m.presenter.Err = ""
-							return m, nil
-						}
-						m.pendingUnsafeItem = nil
-					}
+					// All catalog commands (GET and SET presets) are safe by
+					// construction; only the raw scan above needs gating.
 					return m, sendCommandCmd(m.session, item.Command, m.comment.Value())
 				}
 			}
@@ -320,9 +301,7 @@ func (m *Model) applyEvent(event session.Event) {
 	m.log.SetContent(m.presenter.LogText())
 	m.log.GotoBottom()
 	if event.Kind == session.EventDisconnected {
-		m.dualPendingOK = false
-		m.dualPromptVisible = false
-		m.userInteracted = false
+		m.dualPrompt.OnDisconnected()
 		m.commands.SetItems(commandListItems(spp.DefaultModel(), nil, m.options.AllowUnsafe))
 		return
 	}
@@ -339,10 +318,7 @@ func (m Model) exportCmd() tea.Cmd {
 	}
 	path := filepath.Join(dir, time.Now().Format("2006-01-02_15-04-05")+"_packets.json")
 	return func() tea.Msg {
-		if len(events) == 0 {
-			return errMsg(fmt.Errorf("no packets to export"))
-		}
-		if err := trace.Export(path, events, comment, m.options.LogRaw); err != nil {
+		if err := actions.ExportPackets(path, events, comment, m.options.LogRaw); err != nil {
 			return errMsg(err)
 		}
 		return eventMsg(session.Event{Kind: session.EventPacketTX, Trace: trace.Event{Summary: "exported " + path}})
@@ -380,38 +356,25 @@ func runScanCmd(ctx context.Context, s *session.Session, fields []string) tea.Cm
 		if ctx == nil {
 			ctx = context.Background()
 		}
-		start, end, delay, err := spp.ParseScanCommand(fields)
-		if err != nil {
-			return errMsg(err)
-		}
-		if err := s.RunQueryScan(ctx, start, end, delay); err != nil {
+		if err := actions.ExecuteScan(ctx, s, fields); err != nil {
 			return errMsg(err)
 		}
 		return eventMsg(session.Event{
 			Kind:    session.EventProgress,
 			Source:  "scan",
-			Trigger: fmt.Sprintf("scan finished %04x..%04x", start, end),
+			Trigger: "scan finished " + strings.Join(fields[1:], " "),
 		})
 	}
 }
 
 func sendCommandCmd(s *session.Session, item presenter.Command, comment string) tea.Cmd {
 	return func() tea.Msg {
-		if len(item.Fields) > 0 {
-			pkt, warnings, err := s.FeaturePacket(item.Fields)
-			if err != nil {
-				return errMsg(err)
-			}
-			if len(warnings) > 0 {
-				comment = strings.TrimSpace(comment + " " + strings.Join(warnings, "; "))
-			}
-			if err := s.Send(pkt, session.Meta{Source: "tui", Trigger: strings.Join(item.Fields, " "), UserComment: comment}); err != nil {
-				return errMsg(err)
-			}
-			return nil
-		}
-		if err := s.SendCommand(item.Cmd, session.Meta{Source: "tui", Trigger: item.Title, UserComment: comment}); err != nil {
-			return errMsg(err)
+		result := actions.Execute(s, item, actions.ExecOpts{
+			Comment: comment,
+			Source:  "tui",
+		})
+		if result.Err != nil {
+			return errMsg(result.Err)
 		}
 		return nil
 	}

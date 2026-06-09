@@ -75,6 +75,7 @@ type pendingTX struct {
 
 type Session struct {
 	mu           sync.Mutex
+	connectMu    sync.Mutex
 	f            *os.File
 	device       bt.Device
 	model        spp.ModelInfo
@@ -90,6 +91,7 @@ type Session struct {
 	rawCapture   *os.File
 	allowUnsafe  bool
 	probeEnabled bool
+	manualModel  bool
 }
 
 func New(logger *trace.Logger, allowUnsafe, probeEnabled bool) *Session {
@@ -138,12 +140,6 @@ func (s *Session) Snapshot() Snapshot {
 	return Snapshot{Device: s.device, Model: s.model, Batteries: batteries, DualList: dualList, Connected: s.f != nil, Config: config}
 }
 
-func (s *Session) AllowUnsafe() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.allowUnsafe
-}
-
 func (s *Session) SetModel(model spp.ModelInfo) {
 	s.setModel(model, "tui", "manual model select")
 }
@@ -151,6 +147,7 @@ func (s *Session) SetModel(model spp.ModelInfo) {
 func (s *Session) setModel(model spp.ModelInfo, source, trigger string) {
 	s.mu.Lock()
 	s.model = model
+	s.manualModel = true
 	dev := s.device
 	logger := s.logger
 	s.mu.Unlock()
@@ -245,6 +242,9 @@ func (s *Session) Connect(device bt.Device, rfcommPath string, channel int) erro
 		device = bt.EnrichDeviceInfo(device)
 	}
 
+	s.connectMu.Lock()
+	defer s.connectMu.Unlock()
+
 	// Idempotency guard: a second connect to the same device while a live link
 	// exists would reopen /dev/rfcommN and churn the RFCOMM session (duplicate
 	// read loops and probes), which can wedge the earbuds. Skip it.
@@ -281,7 +281,7 @@ func (s *Session) Connect(device bt.Device, rfcommPath string, channel int) erro
 	s.f = f
 	device.Channel = usedChannel
 	s.device = device
-	s.pending = map[byte]pendingTX{}
+	s.clearLiveStateLocked()
 	modelEvent = s.autoDetectModelLocked(device)
 	if s.rawCapture != nil {
 		_ = s.rawCapture.Close()
@@ -410,18 +410,6 @@ func (s *Session) isCurrentDevice(device bt.Device) bool {
 	return s.f != nil && s.device.MAC == device.MAC
 }
 
-func (s *Session) Attach(f *os.File, device bt.Device) {
-	s.mu.Lock()
-	if s.f != nil {
-		_ = s.f.Close()
-	}
-	s.f = f
-	s.device = device
-	s.mu.Unlock()
-	s.publish(Event{Kind: EventConnected, Device: device, Source: "tui", Trigger: "attach"})
-	go s.readLoop(f)
-}
-
 func (s *Session) Close() error {
 	s.mu.Lock()
 	f := s.f
@@ -431,15 +419,6 @@ func (s *Session) Close() error {
 	}
 	_, closeErr := s.finalizeDisconnect(f, "shutdown", "RFCOMM closed", nil)
 	return closeErr
-}
-
-// clearLiveStateLocked resets per-connection data. Caller holds s.mu.
-func (s *Session) clearLiveStateLocked() {
-	s.batteries = map[string]spp.Battery{}
-	s.config = map[string]string{}
-	s.dualList = nil
-	s.pending = map[byte]pendingTX{}
-	s.model = spp.DefaultModel()
 }
 
 // finalizeDisconnect tears down the active RFCOMM link and live session state,
@@ -504,13 +483,17 @@ func (s *Session) Send(pkt spp.Packet, meta Meta) error {
 	raw := pkt.MarshalBinary()
 	s.mu.Lock()
 	f := s.f
-	dev := s.device
-	model := s.model
-	s.mu.Unlock()
 	if f == nil {
+		s.mu.Unlock()
 		return fmt.Errorf("not connected")
 	}
-	if _, err := f.Write(raw); err != nil {
+	dev := s.device
+	model := s.model
+	s.pending[pkt.FSN] = pendingTX{command: fmt.Sprintf("%04x", pkt.Cmd), trigger: meta.Trigger}
+	_, err := f.Write(raw)
+	if err != nil {
+		delete(s.pending, pkt.FSN)
+		s.mu.Unlock()
 		s.publish(Event{Kind: EventError, Device: dev, Error: err, Source: meta.Source, Trigger: meta.Trigger})
 		return err
 	}
@@ -519,9 +502,7 @@ func (s *Session) Send(pkt spp.Packet, meta Meta) error {
 	if s.logger != nil {
 		tr = s.logger.LogTX(raw, pkt, ctx)
 	}
-	s.mu.Lock()
 	s.lastTX = &tr
-	s.pending[pkt.FSN] = pendingTX{command: fmt.Sprintf("%04x", pkt.Cmd), trigger: meta.Trigger}
 	s.mu.Unlock()
 	s.publish(Event{Kind: EventPacketTX, Device: dev, Raw: raw, Packet: pkt, Trace: tr, Source: meta.Source, Trigger: meta.Trigger})
 	return nil
@@ -678,145 +659,7 @@ func (s *Session) handleRaw(raw []byte) {
 	s.publish(Event{Kind: kind, Device: dev, Raw: raw, Packet: pkt, Parsed: parsed, Trace: tr, Source: "device"})
 }
 
-func mergeBatteries(current, update map[string]spp.Battery) map[string]spp.Battery {
-	out := cloneBatteries(current)
-	if out == nil {
-		out = map[string]spp.Battery{}
-	}
-	for part, battery := range update {
-		out[part] = battery
-	}
-	if _, ok := update["case"]; ok {
-		delete(out, "stereo")
-	}
-	return out
-}
-
-func cloneBatteries(src map[string]spp.Battery) map[string]spp.Battery {
-	if len(src) == 0 {
-		return nil
-	}
-	out := make(map[string]spp.Battery, len(src))
-	for part, battery := range src {
-		out[part] = battery
-	}
-	return out
-}
-
-// recordConfig stores the latest decoded device configuration (ANC, low
-// latency, dual, EQ, spatial) so the UI can render it after auto-discovery.
-func (s *Session) recordConfig(parsed spp.ParsedPacket) {
-	var key string
-	switch parsed.Kind {
-	case "anc_response", "anc_changed":
-		key = "anc"
-	case "lag_response", "lag_changed":
-		key = "lag"
-	case "eq_response":
-		key = "eq"
-	case "spatial_response":
-		key = "spatial"
-	// Only the dual ENABLE state feeds the toggle; the device list and peer
-	// connect events are tracked separately and must not overwrite it.
-	case "dual_response", "dual_switch_changed":
-		key = "dual"
-	default:
-		return
-	}
-	value := parsed.Summary
-	if _, rest, ok := strings.Cut(parsed.Summary, ": "); ok {
-		value = rest
-	}
-	if value == "" {
-		return
-	}
-	s.mu.Lock()
-	s.config[key] = value
-	s.mu.Unlock()
-}
-
-// matchRequest pairs an incoming response with the originating request by the
-// echoed FSN. Falls back to deriving the request command from the response
-// command (0x40xx -> 0xC0xx).
-func (s *Session) matchRequest(pkt spp.Packet) string {
-	s.mu.Lock()
-	p, ok := s.pending[pkt.FSN]
-	if ok {
-		delete(s.pending, pkt.FSN)
-	}
-	s.mu.Unlock()
-	if ok {
-		return p.command
-	}
-	// Responses set bit 0x4000; the request had bit 0x8000 set.
-	if pkt.Cmd&0xF000 == 0x4000 {
-		return fmt.Sprintf("%04x", pkt.Cmd|0x8000)
-	}
-	return ""
-}
-
 func (s *Session) traceContext(meta Meta, dev bt.Device, model spp.ModelInfo, related string) trace.Context {
 	return trace.Context{Source: meta.Source, Trigger: meta.Trigger, Device: trace.DeviceInfo{MAC: dev.MAC, Name: dev.Name}, Model: model, UserComment: meta.UserComment, RelatedTXCommand: related}
 }
 
-func (s *Session) publish(event Event) {
-	if s.logger != nil && event.Trace.Direction == "" {
-		s.logger.LogEvent(trace.Event{
-			Direction:     string(event.Kind),
-			Source:        event.Source,
-			Trigger:       event.Trigger,
-			DeviceMAC:     event.Device.MAC,
-			DeviceName:    event.Device.Name,
-			ModelCodename: s.Snapshot().Model.Codename,
-			Summary:       eventSummary(event),
-			Error:         errorString(event.Error),
-		})
-	}
-	select {
-	case s.events <- event:
-	default:
-	}
-	s.mu.Lock()
-	subscribers := append([]chan Event(nil), s.subscribers...)
-	s.mu.Unlock()
-	for _, ch := range subscribers {
-		if isPriorityEvent(event.Kind) {
-			select {
-			case ch <- event:
-			case <-time.After(2 * time.Second):
-				// Subscriber slow; drop after brief wait rather than block forever.
-			}
-			continue
-		}
-		select {
-		case ch <- event:
-		default:
-		}
-	}
-}
-
-func isPriorityEvent(kind EventKind) bool {
-	switch kind {
-	case EventBattery, EventConnected, EventDisconnected:
-		return true
-	default:
-		return false
-	}
-}
-
-func eventSummary(event Event) string {
-	if event.Trigger != "" {
-		return event.Trigger
-	}
-	if event.Error != nil {
-		return event.Error.Error()
-	}
-	return string(event.Kind)
-}
-
-func errorString(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
-}

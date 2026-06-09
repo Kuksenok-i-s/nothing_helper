@@ -317,6 +317,116 @@ func TestMergeBatteriesDropsStaleStereoWhenCaseUpdated(t *testing.T) {
 	}
 }
 
+func TestSendLeavesPendingAfterSuccessfulWrite(t *testing.T) {
+	spp.ResetFSN()
+	s := New(nil, false, false)
+	f, err := os.CreateTemp(t.TempDir(), "rfcomm")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.mu.Lock()
+	s.f = f
+	s.device = bt.Device{MAC: "AA:BB:CC:DD:EE:FF", Name: "Nothing Ear"}
+	s.mu.Unlock()
+
+	if err := s.SendCommand(spp.CmdGetBattery, Meta{Source: "test", Trigger: "battery"}); err != nil {
+		t.Fatalf("Send() error = %v", err)
+	}
+	s.mu.Lock()
+	_, ok := s.pending[1]
+	s.mu.Unlock()
+	if !ok {
+		t.Fatal("pending entry must remain after successful write for RX correlation")
+	}
+}
+
+func TestSendRemovesPendingOnWriteError(t *testing.T) {
+	spp.ResetFSN()
+	s := New(nil, false, false)
+	f, err := os.CreateTemp(t.TempDir(), "rfcomm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+
+	s.mu.Lock()
+	s.f = f
+	s.device = bt.Device{MAC: "AA:BB:CC:DD:EE:FF", Name: "Nothing Ear"}
+	s.mu.Unlock()
+
+	if err := s.SendCommand(spp.CmdGetBattery, Meta{Source: "test", Trigger: "battery"}); err == nil {
+		t.Fatal("expected write error on closed file")
+	}
+	s.mu.Lock()
+	pendingLen := len(s.pending)
+	s.mu.Unlock()
+	if pendingLen != 0 {
+		t.Fatalf("pending map len = %d, want 0 after write failure", pendingLen)
+	}
+}
+
+func TestConnectClearsLiveStateOnDeviceSwitch(t *testing.T) {
+	s := New(nil, false, false)
+	f, err := os.CreateTemp(t.TempDir(), "rfcomm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	s.f = f
+	s.device = bt.Device{MAC: "AA:BB:CC:DD:EE:FF", Name: "Ear A"}
+	s.batteries = map[string]spp.Battery{"left": {Percent: 80}}
+	s.config = map[string]string{"anc": "on"}
+	s.dualList = []spp.DualDevice{{MAC: "11:22:33:44:55:66"}}
+	s.model, _ = spp.ResolveModelInfo("EarThree")
+	s.mu.Unlock()
+
+	f2, err := os.CreateTemp(t.TempDir(), "rfcomm2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	if s.f != nil {
+		_ = s.f.Close()
+	}
+	s.f = f2
+	s.device = bt.Device{MAC: "BB:CC:DD:EE:FF:00", Name: "Ear B"}
+	s.clearLiveStateLocked()
+	s.mu.Unlock()
+
+	snap := s.Snapshot()
+	if len(snap.Batteries) != 0 {
+		t.Fatalf("batteries = %+v, want empty after device switch", snap.Batteries)
+	}
+	if len(snap.Config) != 0 {
+		t.Fatalf("config = %+v, want empty after device switch", snap.Config)
+	}
+	if len(snap.DualList) != 0 {
+		t.Fatalf("dualList = %+v, want empty after device switch", snap.DualList)
+	}
+	if snap.Model.Codename != "" {
+		t.Fatalf("model = %+v, want default after device switch", snap.Model)
+	}
+}
+
+func TestClearLiveStatePreservesManualModel(t *testing.T) {
+	s := New(nil, false, false)
+	manual, ok := spp.ResolveModelInfo("EarThree")
+	if !ok {
+		t.Fatal("EarThree model not found")
+	}
+	s.SetModel(manual)
+
+	s.mu.Lock()
+	s.clearLiveStateLocked()
+	model := s.model
+	s.mu.Unlock()
+
+	if model.Codename != "EarThree" {
+		t.Fatalf("model = %q, want manual EarThree preserved across reconnect", model.Codename)
+	}
+}
+
 func TestPublishDeliversPriorityEventsWhenBufferFull(t *testing.T) {
 	s := New(nil, false, false)
 	events := s.Subscribe()
