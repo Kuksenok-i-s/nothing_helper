@@ -53,8 +53,12 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 		}
 		sess.SetModel(model)
 	}
-	if cfg.QueryEvery > 0 {
-		sess.StartBatteryPolling(ctx, cfg.QueryEvery)
+	queryEvery := cfg.QueryEvery
+	if cfg.Notify && queryEvery <= 0 {
+		queryEvery = 60 * time.Second
+	}
+	if queryEvery > 0 {
+		sess.StartBatteryPolling(ctx, queryEvery)
 	}
 
 	return &Runtime{

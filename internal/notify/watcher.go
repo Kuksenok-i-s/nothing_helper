@@ -42,7 +42,7 @@ type Options struct {
 }
 
 // Run subscribes to session events and emits desktop notifications for
-// connect/disconnect, battery level changes, and low-battery warnings. It
+// connect/disconnect, in-place battery levels, and low-battery warnings. It
 // returns when ctx is cancelled or the event stream closes.
 func Run(ctx context.Context, s *session.Session, opts Options) {
 	if opts.AppName == "" {
@@ -61,13 +61,19 @@ func Run(ctx context.Context, s *session.Session, opts Options) {
 
 	n := New(opts.AppName, "audio-headphones")
 	if !n.Available() {
+		Warnf("desktop notifications disabled: gdbus and notify-send not found in PATH")
 		return
 	}
 
-	events := s.Subscribe()
-	// lowFired[component] = lowest threshold already alerted, to avoid repeats.
-	lowFired := map[string]int{}
+	watch(ctx, s.Subscribe(), s, n, opts, earbudLevels, caseLevels)
+}
 
+type sessionView interface {
+	Snapshot() session.Snapshot
+}
+
+func watch(ctx context.Context, events <-chan session.Event, sv sessionView, n *Notifier, opts Options, earbudLevels, caseLevels []lowLevel) {
+	lowFired := map[string]int{}
 	for {
 		select {
 		case <-ctx.Done():
@@ -76,24 +82,26 @@ func Run(ctx context.Context, s *session.Session, opts Options) {
 			if !ok {
 				return
 			}
-			switch ev.Kind {
-			case session.EventConnected:
-				n.Alert(UrgencyNormal, opts.AppName, "Connected to "+deviceName(s, opts.AppName))
-			case session.EventDisconnected:
-				lowFired = map[string]int{}
-				n.Alert(UrgencyNormal, opts.AppName, "Disconnected")
-			case session.EventBattery:
-				// Only alert on the low-battery thresholds (20/10/5), never on
-				// every battery change.
-				checkLowBattery(n, s.Snapshot().Batteries, earbudLevels, caseLevels, lowFired)
-			}
+			processEvent(ev, sv, n, opts, earbudLevels, caseLevels, lowFired)
 		}
 	}
 }
 
-// earbudComponent reports whether comp is an earbud/headphone (not the case).
-func earbudComponent(comp string) bool {
-	return comp == "left" || comp == "right" || comp == "stereo"
+func processEvent(ev session.Event, sv sessionView, n *Notifier, opts Options, earbudLevels, caseLevels []lowLevel, lowFired map[string]int) {
+	switch ev.Kind {
+	case session.EventConnected:
+		n.Alert(UrgencyNormal, opts.AppName, "Connected to "+deviceName(sv, opts.AppName))
+		checkLowBattery(n, sv.Snapshot().Batteries, earbudLevels, caseLevels, lowFired)
+	case session.EventDisconnected:
+		clear(lowFired)
+		n.Alert(UrgencyNormal, opts.AppName, "Disconnected")
+	case session.EventBattery:
+		batteries := sv.Snapshot().Batteries
+		if body := formatBatteries(batteries); body != "" {
+			n.Update(opts.AppName, body)
+		}
+		checkLowBattery(n, batteries, earbudLevels, caseLevels, lowFired)
+	}
 }
 
 func sortLevels(levels []lowLevel) {
@@ -111,7 +119,6 @@ func checkLowBattery(n *Notifier, data map[string]spp.Battery, earbudLevels, cas
 			delete(fired, comp)
 			continue
 		}
-		// levels are descending; the last match is the lowest threshold crossed.
 		var hit *lowLevel
 		for i := range levels {
 			if b.Percent <= levels[i].percent {
@@ -131,8 +138,8 @@ func checkLowBattery(n *Notifier, data map[string]spp.Battery, earbudLevels, cas
 	}
 }
 
-func deviceName(s *session.Session, fallback string) string {
-	snap := s.Snapshot()
+func deviceName(sv sessionView, fallback string) string {
+	snap := sv.Snapshot()
 	if snap.Device.Name != "" {
 		return snap.Device.Name
 	}
@@ -146,14 +153,24 @@ func deviceName(s *session.Session, fallback string) string {
 }
 
 func orderedComponents(data map[string]spp.Battery) []string {
-	order := []string{"left", "right", "case", "stereo"}
+	order := []string{"left", "right", "case", "stereo", "tws", "watch"}
+	seen := make(map[string]struct{}, len(data))
 	out := make([]string, 0, len(data))
 	for _, k := range order {
 		if _, ok := data[k]; ok {
 			out = append(out, k)
+			seen[k] = struct{}{}
 		}
 	}
-	return out
+	extras := make([]string, 0, len(data))
+	for k := range data {
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		extras = append(extras, k)
+	}
+	sort.Strings(extras)
+	return append(out, extras...)
 }
 
 func componentLabel(comp string) string {
@@ -166,17 +183,31 @@ func componentLabel(comp string) string {
 		return "Case"
 	case "stereo":
 		return "Headphones"
+	case "tws":
+		return "Earbuds"
+	case "watch":
+		return "Watch"
 	default:
+		if strings.HasPrefix(comp, "id_") {
+			return "Device " + strings.TrimPrefix(comp, "id_")
+		}
 		return comp
 	}
 }
 
 func formatBatteries(data map[string]spp.Battery) string {
-	labels := map[string]string{"left": "Left", "right": "Right", "case": "Case", "stereo": "Headphones"}
+	labels := map[string]string{
+		"left": "Left", "right": "Right", "case": "Case",
+		"stereo": "Headphones", "tws": "Earbuds", "watch": "Watch",
+	}
 	parts := make([]string, 0, len(data))
 	for _, comp := range orderedComponents(data) {
+		label := labels[comp]
+		if label == "" {
+			label = componentLabel(comp)
+		}
 		b := data[comp]
-		s := fmt.Sprintf("%s %d%%", labels[comp], b.Percent)
+		s := fmt.Sprintf("%s %d%%", label, b.Percent)
 		if b.Charging {
 			s += " ⚡"
 		}

@@ -300,3 +300,49 @@ func TestHandleRawMergesPartialBatteryEvents(t *testing.T) {
 		t.Fatalf("event case battery = %+v, want 100%%", got)
 	}
 }
+
+func TestMergeBatteriesDropsStaleStereoWhenCaseUpdated(t *testing.T) {
+	current := map[string]spp.Battery{
+		"stereo": {Percent: 80},
+	}
+	update := map[string]spp.Battery{
+		"case": {Percent: 75},
+	}
+	merged := mergeBatteries(current, update)
+	if _, ok := merged["stereo"]; ok {
+		t.Fatal("stereo key should be removed when case is updated")
+	}
+	if got := merged["case"].Percent; got != 75 {
+		t.Fatalf("case = %d, want 75", got)
+	}
+}
+
+func TestPublishDeliversPriorityEventsWhenBufferFull(t *testing.T) {
+	s := New(nil, false, false)
+	events := s.Subscribe()
+	for i := 0; i < 256; i++ {
+		s.publish(Event{Kind: EventProgress, Trigger: "fill"})
+	}
+
+	got := make(chan EventKind, 1)
+	go func() {
+		for {
+			ev := <-events
+			if ev.Kind == EventBattery {
+				got <- ev.Kind
+				return
+			}
+		}
+	}()
+
+	s.publish(Event{Kind: EventBattery, Parsed: spp.ParsedPacket{Summary: "battery"}})
+
+	select {
+	case kind := <-got:
+		if kind != EventBattery {
+			t.Fatalf("kind = %q, want battery", kind)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for priority battery event")
+	}
+}

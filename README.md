@@ -94,10 +94,10 @@ Shared by `cmd/tws_manager` and `cmd/tws_manager_gio` (defaults may differ):
 | `--log-raw` | `false` | include raw bytes in log/export |
 | `--capture-dir` | `captures` | JSON packet export directory |
 | `--no-probe` | `false` | skip identity/battery probes after connect |
-| `--query-every` | `0` | periodic GET_BATTERY, e.g. `30s` |
+| `--query-every` | `0` (or `60s` when `--notify`) | periodic GET_BATTERY, e.g. `30s` |
 | `--unsafe` | `false` | allow SET and raw scan in UI |
 | `--auto` | TUI: `false`, Gio: `true` | auto-discover and connect |
-| `--notify` | TUI: `false`, Gio: `true` | desktop notifications |
+| `--notify` | TUI: `false`, Gio: `true` | desktop notifications (needs `gdbus` or `libnotify` / `notify-send`) |
 | `--privilege-helper` | TUI: `sudo`, Gio: `auto` | backend for privileged ops: `sudo`, `polkit`, `auto`, `none` |
 | `--privilege-helper-path` | - | path to `tws_manager_rfcomm_helper` for `polkit` |
 

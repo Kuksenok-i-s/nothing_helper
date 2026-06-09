@@ -686,6 +686,9 @@ func mergeBatteries(current, update map[string]spp.Battery) map[string]spp.Batte
 	for part, battery := range update {
 		out[part] = battery
 	}
+	if _, ok := update["case"]; ok {
+		delete(out, "stereo")
+	}
 	return out
 }
 
@@ -777,10 +780,27 @@ func (s *Session) publish(event Event) {
 	subscribers := append([]chan Event(nil), s.subscribers...)
 	s.mu.Unlock()
 	for _, ch := range subscribers {
+		if isPriorityEvent(event.Kind) {
+			select {
+			case ch <- event:
+			case <-time.After(2 * time.Second):
+				// Subscriber slow; drop after brief wait rather than block forever.
+			}
+			continue
+		}
 		select {
 		case ch <- event:
 		default:
 		}
+	}
+}
+
+func isPriorityEvent(kind EventKind) bool {
+	switch kind {
+	case EventBattery, EventConnected, EventDisconnected:
+		return true
+	default:
+		return false
 	}
 }
 

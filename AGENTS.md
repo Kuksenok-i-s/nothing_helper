@@ -35,8 +35,9 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
  - `AutoConnect`/`ConnectBest`/`BestCandidate` - автодискавери и reconnect-on-loss.
 
 - `internal/notify`
- - desktop-уведомления (GNOME/freedesktop) через `gdbus`/`notify-send`, no-op без них;
- - watcher событий сессии: connect/disconnect, батарея (in-place), low-battery alerts.
+ - desktop-уведомления (GNOME/freedesktop) через `gdbus`/`notify-send`, warning в stderr если backend недоступен;
+ - watcher событий сессии: connect/disconnect, батарея in-place (`Notifier.Update`), low-battery alerts (20/10/5%);
+ - при `--notify` без `--query-every` включается опрос батареи каждые 60 с.
 
 - `internal/ui/presenter`
   - общий лог/статус и каталог команд для TUI и Gio.

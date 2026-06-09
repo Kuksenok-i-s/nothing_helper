@@ -91,10 +91,10 @@ make run-gio-lite
 | `--log-raw` | `false` | включить raw bytes в лог/экспорт |
 | `--capture-dir` | `captures` | каталог JSON-экспорта пакетов |
 | `--no-probe` | `false` | не слать identity/battery после connect |
-| `--query-every` | `0` | периодический GET_BATTERY, напр. `30s` |
+| `--query-every` | `0` (или `60s` при `--notify`) | периодический GET_BATTERY, напр. `30s` |
 | `--unsafe` | `false` | разрешить SET и raw scan в UI |
 | `--auto` | TUI: `false`, Gio: `true` | автопоиск и подключение |
-| `--notify` | TUI: `false`, Gio: `true` | desktop-уведомления |
+| `--notify` | TUI: `false`, Gio: `true` | desktop-уведомления (нужны `gdbus` или `libnotify` / `notify-send`) |
 | `--privilege-helper` | TUI: `sudo`, Gio: `auto` | backend для privileged операций: `sudo`, `polkit`, `auto`, `none` |
 | `--privilege-helper-path` | - | путь к `tws_manager_rfcomm_helper` для `polkit` |
 
