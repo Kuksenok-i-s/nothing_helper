@@ -19,8 +19,13 @@ type Options struct {
 	InitialDevice bt.Device
 	PCPrimary     dualpolicy.Mode
 
-	// OnExit runs exactly once after the window event loop ends, just before the
-	// process terminates. On desktop app.Main never returns, so Run exits the
-	// process itself; OnExit lets the caller flush logs and close the session.
-	OnExit func()
+	// HideToTray keeps the process alive when the user closes the window;
+	// the tray icon and RFCOMM session stay active until Quit or SIGTERM.
+	HideToTray bool
+	// ShowCh receives signals from the tray "Show window" action (buffer 1).
+	ShowCh chan struct{}
+
+	// OnQuit runs once before the process terminates on real shutdown
+	// (ctx cancelled or window closed without HideToTray). Not called on hide-to-tray.
+	OnQuit func()
 }

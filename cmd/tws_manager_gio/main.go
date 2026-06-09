@@ -55,12 +55,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := app.Run(ctx, cfg, run); err != nil && ctx.Err() == nil {
+	if err := app.Run(ctx, cfg, func(ctx context.Context, rt *app.Runtime) error {
+		return run(ctx, rt, stop)
+	}); err != nil && ctx.Err() == nil {
 		fatalf("%v", err)
 	}
 }
 
-func run(ctx context.Context, rt *app.Runtime) error {
+func run(ctx context.Context, rt *app.Runtime, stop context.CancelFunc) error {
 	pcPrimaryMode, err := dualpolicy.ParseMode(rt.Config.PCPrimary)
 	if err != nil {
 		return err
@@ -98,11 +100,21 @@ func run(ctx context.Context, rt *app.Runtime) error {
 		}
 	}
 
+	showCh := make(chan struct{}, 1)
+	signalShow := func() {
+		select {
+		case showCh <- struct{}{}:
+		default:
+		}
+	}
+
 	go tray.Run(ctx, rt.Session, tray.Options{
 		AppName: "tws_manager",
 		OnReconnect: func() {
 			_ = mgr.ConnectBest(ctx, func(msg string) { fmt.Fprintln(os.Stderr, msg) })
 		},
+		OnShowWindow: signalShow,
+		OnQuit:       stop,
 	})
 	return gio.Run(ctx, gio.Options{
 		Manager:       mgr,
@@ -113,10 +125,12 @@ func run(ctx context.Context, rt *app.Runtime) error {
 		AutoConnect:   rt.Config.AutoDiscover,
 		InitialDevice: initialDevice,
 		PCPrimary:     pcPrimaryMode,
+		HideToTray:    hideToTray(),
+		ShowCh:        showCh,
 		// Run terminates the process itself (app.Main never returns), so flush
 		// the trace log and close the RFCOMM session here. Shutdown is
 		// idempotent, so this is safe alongside app.Run's signal handler.
-		OnExit: func() { _ = rt.Shutdown(context.Background()) },
+		OnQuit: func() { _ = rt.Shutdown(context.Background()) },
 	})
 }
 

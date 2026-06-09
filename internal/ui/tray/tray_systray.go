@@ -18,6 +18,10 @@ type Options struct {
 	// OnReconnect, if set, is invoked by the "Reconnect" menu item to trigger an
 	// auto-discovery/connect attempt.
 	OnReconnect func()
+	// OnShowWindow, if set, is invoked by the "Show window" menu item.
+	OnShowWindow func()
+	// OnQuit, if set, is invoked by the "Quit" menu item to cancel the app context.
+	OnQuit func()
 }
 
 func Run(ctx context.Context, s *session.Session, opts Options) {
@@ -37,6 +41,10 @@ func onReady(ctx context.Context, s *session.Session, opts Options) {
 	battery.Disable()
 	systray.AddSeparator()
 
+	showWindow := systray.AddMenuItem("Show window", "Open the main window")
+	if opts.OnShowWindow == nil {
+		showWindow.Hide()
+	}
 	refresh := systray.AddMenuItem("Refresh battery", "Send GET_BATTERY")
 	reconnect := systray.AddMenuItem("Reconnect", "Auto-discover and connect")
 	if opts.OnReconnect == nil {
@@ -56,6 +64,10 @@ func onReady(ctx context.Context, s *session.Session, opts Options) {
 				_ = s.Close()
 				systray.Quit()
 				return
+			case <-showWindow.ClickedCh:
+				if opts.OnShowWindow != nil {
+					opts.OnShowWindow()
+				}
 			case <-refresh.ClickedCh:
 				_ = s.SendCommand(spp.CmdGetBattery, session.Meta{Source: "tray", Trigger: "battery refresh"})
 			case <-reconnect.ClickedCh:
@@ -65,8 +77,12 @@ func onReady(ctx context.Context, s *session.Session, opts Options) {
 			case <-disconnect.ClickedCh:
 				_ = s.Close()
 			case <-quit.ClickedCh:
-				_ = s.Close()
-				systray.Quit()
+				if opts.OnQuit != nil {
+					opts.OnQuit()
+				} else {
+					_ = s.Close()
+					systray.Quit()
+				}
 				return
 			}
 		}

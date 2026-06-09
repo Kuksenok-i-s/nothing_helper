@@ -9,8 +9,10 @@ import (
 )
 
 type Options struct {
-	AppName     string
-	OnReconnect func()
+	AppName      string
+	OnReconnect  func()
+	OnShowWindow func()
+	OnQuit       func()
 }
 
 func Run(ctx context.Context, s *session.Session, opts Options) {

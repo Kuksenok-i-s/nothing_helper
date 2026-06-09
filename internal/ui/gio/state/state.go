@@ -367,6 +367,14 @@ func (s *State) syncCmdButtons() {
 	}
 }
 
+// SetWindow rebinds the Gio window after hide-to-tray recreation.
+func (s *State) SetWindow(w *app.Window) {
+	s.mu.Lock()
+	s.window = w
+	s.mu.Unlock()
+	s.invalidate()
+}
+
 func (s *State) invalidate() {
 	if s.window != nil {
 		s.window.Invalidate()
