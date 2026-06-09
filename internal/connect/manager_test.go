@@ -28,48 +28,6 @@ func TestDeviceFromAddressInvalid(t *testing.T) {
 	}
 }
 
-func TestBestCandidate(t *testing.T) {
-	t.Run("prefers connected SPP", func(t *testing.T) {
-		devs := []bt.Device{
-			{MAC: "AA", SPP: true},
-			{MAC: "BB", Connected: true},
-			{MAC: "CC", SPP: true, Connected: true},
-		}
-		got, ok := BestCandidate(devs)
-		if !ok || got.MAC != "CC" {
-			t.Fatalf("got %+v ok=%v, want CC", got, ok)
-		}
-	})
-	t.Run("falls back to SPP", func(t *testing.T) {
-		devs := []bt.Device{
-			{MAC: "BB", Connected: true},
-			{MAC: "AA", SPP: true},
-		}
-		got, ok := BestCandidate(devs)
-		if !ok || got.MAC != "AA" {
-			t.Fatalf("got %+v ok=%v, want AA", got, ok)
-		}
-	})
-	t.Run("falls back to connected then any", func(t *testing.T) {
-		got, ok := BestCandidate([]bt.Device{{MAC: "BB", Connected: true}, {MAC: "ZZ"}})
-		if !ok || got.MAC != "BB" {
-			t.Fatalf("got %+v ok=%v, want BB", got, ok)
-		}
-		got, ok = BestCandidate([]bt.Device{{MAC: "ZZ"}})
-		if !ok || got.MAC != "ZZ" {
-			t.Fatalf("got %+v ok=%v, want ZZ", got, ok)
-		}
-	})
-	t.Run("empty", func(t *testing.T) {
-		if _, ok := BestCandidate(nil); ok {
-			t.Fatal("expected no candidate")
-		}
-		if _, ok := BestCandidate([]bt.Device{{Name: "x"}}); ok {
-			t.Fatal("device without MAC should be skipped")
-		}
-	})
-}
-
 func TestBestConnectedCandidate(t *testing.T) {
 	t.Run("prefers connected SPP", func(t *testing.T) {
 		devs := []bt.Device{

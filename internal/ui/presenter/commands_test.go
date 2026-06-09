@@ -76,15 +76,6 @@ func TestBuildCommandsIncludesBattery(t *testing.T) {
 	}
 }
 
-func TestNeedsUnsafeConfirmation(t *testing.T) {
-	if !NeedsUnsafeConfirmation(Command{Fields: []string{"anc", "set", "off"}}) {
-		t.Fatal("expected unsafe confirmation")
-	}
-	if NeedsUnsafeConfirmation(Command{Fields: []string{"anc", "get"}}) {
-		t.Fatal("get should not need confirmation")
-	}
-}
-
 func TestBuildCommandsIncludesLowLatencySetWithoutUnsafe(t *testing.T) {
 	model, ok := spp.ResolveModelInfo("EarThree")
 	if !ok {
@@ -112,13 +103,13 @@ func TestBuildCommandsIncludesWriteControlsForDefaultModel(t *testing.T) {
 	cmds := BuildCommands(spp.DefaultModel(), nil, false)
 	var ancSet bool
 	for _, c := range cmds {
-		if len(c.Fields) >= 2 && c.Fields[0] == "anc" && c.Fields[1] == "set" && c.SafeSet {
+		if len(c.Fields) >= 2 && c.Fields[0] == "anc" && c.Fields[1] == "set" {
 			ancSet = true
 			break
 		}
 	}
 	if !ancSet {
-		t.Fatal("default model should expose safe UI write controls")
+		t.Fatal("default model should expose UI write controls")
 	}
 	if toggles := ToggleFeatures(cmds); len(toggles) == 0 {
 		t.Fatal("default model should expose write toggles")

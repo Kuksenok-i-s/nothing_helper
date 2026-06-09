@@ -8,18 +8,17 @@ import (
 )
 
 // Command describes a UI-selectable protocol action.
+//
+// Every command exposed through the catalog is safe by construction: BuildCommands
+// only emits whitelisted GET/SET presets. Unsafe operations (raw scan, arbitrary
+// SETs) are enforced at the session layer and are not part of this catalog,
+// except the raw-scan entry which is added only when --unsafe is active.
 type Command struct {
 	Title    string
 	Desc     string
 	Fields   []string
 	Cmd      uint16
 	Advanced bool
-	SafeSet  bool
-}
-
-// NeedsUnsafeConfirmation reports whether the command needs a second confirmation.
-func NeedsUnsafeConfirmation(c Command) bool {
-	return len(c.Fields) >= 2 && strings.EqualFold(c.Fields[1], "set")
 }
 
 // IsScanCommand reports whether the command is the advanced raw scan entry.
@@ -159,20 +158,20 @@ func BuildCommands(model spp.ModelInfo, dualDevices []spp.DualDevice, allowUnsaf
 		}
 	}
 	for _, item := range []Command{
-		{Title: "SET: anc off", Desc: "Disable ANC", Fields: []string{"anc", "set", "off"}, SafeSet: true},
-		{Title: "SET: anc strong", Desc: "ANC high", Fields: []string{"anc", "set", "strong"}, SafeSet: true},
-		{Title: "SET: anc medium", Desc: "ANC mid", Fields: []string{"anc", "set", "medium"}, SafeSet: true},
-		{Title: "SET: anc weak", Desc: "ANC low", Fields: []string{"anc", "set", "weak"}, SafeSet: true},
-		{Title: "SET: anc adaptive", Desc: "Adaptive ANC", Fields: []string{"anc", "set", "adaptive"}, SafeSet: true},
-		{Title: "SET: anc transparency", Desc: "Transparency mode", Fields: []string{"anc", "set", "transparency"}, SafeSet: true},
-		{Title: "SET: eq balanced", Desc: "EQ preset 0 balanced", Fields: []string{"eq", "set", "0"}, SafeSet: true},
-		{Title: "SET: eq more bass", Desc: "EQ preset 3 more bass", Fields: []string{"eq", "set", "3"}, SafeSet: true},
-		{Title: "SET: spatial on", Desc: "Enable spatial audio", Fields: []string{"spatial", "set", "on"}, SafeSet: true},
-		{Title: "SET: spatial off", Desc: "Disable spatial audio", Fields: []string{"spatial", "set", "off"}, SafeSet: true},
-		{Title: "SET: low latency on", Desc: "Enable low-latency mode", Fields: []string{"lag", "set", "on"}, SafeSet: true},
-		{Title: "SET: low latency off", Desc: "Disable low-latency mode", Fields: []string{"lag", "set", "off"}, SafeSet: true},
-		{Title: "SET: dual on", Desc: "Enable dual connection", Fields: []string{"dual", "set", "on"}, SafeSet: true},
-		{Title: "SET: dual off", Desc: "Disable dual connection", Fields: []string{"dual", "set", "off"}, SafeSet: true},
+		{Title: "SET: anc off", Desc: "Disable ANC", Fields: []string{"anc", "set", "off"}},
+		{Title: "SET: anc strong", Desc: "ANC high", Fields: []string{"anc", "set", "strong"}},
+		{Title: "SET: anc medium", Desc: "ANC mid", Fields: []string{"anc", "set", "medium"}},
+		{Title: "SET: anc weak", Desc: "ANC low", Fields: []string{"anc", "set", "weak"}},
+		{Title: "SET: anc adaptive", Desc: "Adaptive ANC", Fields: []string{"anc", "set", "adaptive"}},
+		{Title: "SET: anc transparency", Desc: "Transparency mode", Fields: []string{"anc", "set", "transparency"}},
+		{Title: "SET: eq balanced", Desc: "EQ preset 0 balanced", Fields: []string{"eq", "set", "0"}},
+		{Title: "SET: eq more bass", Desc: "EQ preset 3 more bass", Fields: []string{"eq", "set", "3"}},
+		{Title: "SET: spatial on", Desc: "Enable spatial audio", Fields: []string{"spatial", "set", "on"}},
+		{Title: "SET: spatial off", Desc: "Disable spatial audio", Fields: []string{"spatial", "set", "off"}},
+		{Title: "SET: low latency on", Desc: "Enable low-latency mode", Fields: []string{"lag", "set", "on"}},
+		{Title: "SET: low latency off", Desc: "Disable low-latency mode", Fields: []string{"lag", "set", "off"}},
+		{Title: "SET: dual on", Desc: "Enable dual connection", Fields: []string{"dual", "set", "on"}},
+		{Title: "SET: dual off", Desc: "Disable dual connection", Fields: []string{"dual", "set", "off"}},
 	} {
 		feature := item.Fields[0]
 		if spp.ModelSupportsFeature(model, feature) {
@@ -189,10 +188,9 @@ func BuildCommands(model spp.ModelInfo, dualDevices []spp.DualDevice, allowUnsaf
 			name = dev.MAC
 		}
 		items = append(items, Command{
-			Title:   fmt.Sprintf("Dual: %s %s", action, name),
-			Desc:    fmt.Sprintf("%s %s via SET_CONNECT_DEVICE", action, dev.MAC),
-			Fields:  []string{"dual", action, dev.MAC},
-			SafeSet: true,
+			Title:  fmt.Sprintf("Dual: %s %s", action, name),
+			Desc:   fmt.Sprintf("%s %s via SET_CONNECT_DEVICE", action, dev.MAC),
+			Fields: []string{"dual", action, dev.MAC},
 		})
 	}
 	if allowUnsafe {

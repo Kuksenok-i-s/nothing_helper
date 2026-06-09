@@ -479,6 +479,24 @@ func TestParseDualDeviceListPayload(t *testing.T) {
 	}
 }
 
+func TestParseDualDeviceListPayloadTruncated(t *testing.T) {
+	_, err := ParseDualDeviceListPayload([]byte{0x01, 0x00, 0x02, 0x11, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff})
+	if err == nil {
+		t.Fatal("ParseDualDeviceListPayload() error = nil, want truncated list error")
+	}
+}
+
+func TestCmdBudsBatteryCatalogMatchesParser(t *testing.T) {
+	info := CommandInfoFor(CmdBudsBattery)
+	if info.Name != "event_buds_battery" || info.Kind != "battery_pairs" {
+		t.Fatalf("catalog = %+v, want event_buds_battery/battery_pairs", info)
+	}
+	parsed := ParsePacket(Packet{Cmd: CmdBudsBattery, Payload: []byte{0x01, 0x02, 0x46}}, DefaultModel())
+	if parsed.Kind != "battery_buds" {
+		t.Fatalf("parsed kind = %q, want battery_buds", parsed.Kind)
+	}
+}
+
 func TestParseDualMAC(t *testing.T) {
 	tests := []struct {
 		name    string

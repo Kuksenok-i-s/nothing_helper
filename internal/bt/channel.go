@@ -1,8 +1,7 @@
 package bt
 
 import (
-	"fmt"
-	"strings"
+	"errors"
 	"time"
 
 	"tws_manager/internal/security"
@@ -94,52 +93,39 @@ func shouldProbeNextChannel(err error) bool {
 	if err == nil {
 		return false
 	}
+	if errors.Is(err, ErrRFCOMMPermission) ||
+		errors.Is(err, ErrInvalidBluetoothMAC) {
+		return false
+	}
 	if isRecoverableRFCOMMOpenError(err) {
 		return true
 	}
-	msg := strings.ToLower(err.Error())
-	if strings.Contains(msg, "permission") ||
-		strings.Contains(msg, "privilege") ||
-		strings.Contains(msg, "sudo") ||
-		strings.Contains(msg, "invalid bluetooth mac") {
-		return false
+	if errors.Is(err, ErrRFCOMMBindFailed) ||
+		errors.Is(err, ErrRFCOMMWaitFailed) ||
+		errors.Is(err, ErrRFCOMMOpenFailed) ||
+		errors.Is(err, ErrRFCOMMReviveFailed) ||
+		errors.Is(err, ErrRFCOMMNoChannel) {
+		return true
 	}
-	return strings.Contains(msg, "bind") ||
-		strings.Contains(msg, "rfcomm") ||
-		strings.Contains(msg, "timed out") ||
-		strings.Contains(msg, "wait for") ||
-		strings.Contains(msg, "revive failed") ||
-		strings.Contains(msg, "create ") ||
-		strings.Contains(msg, "no working")
+	return false
 }
 
 // BindRFCOMMWithProbe binds device to address, trying alternate RFCOMM channels
 // when the preferred channel fails. Returns the channel that worked.
 func BindRFCOMMWithProbe(device, address string, preferred int, progress RFCOMMProgress) (int, error) {
 	preferred = ResolveDeviceChannel(address, preferred)
-	var lastErr error
-	for i, ch := range channelCandidates(preferred) {
-		if i > 0 {
-			report(progress, fmt.Sprintf("bind: trying RFCOMM channel %d", ch))
+	return probeRFCOMMChannels(preferred, progress, "bind: trying", func(ch, attempt int) error {
+		if attempt > 0 {
 			_ = ReleaseRFCOMMDevice(device)
 		}
 		if err := BindRFCOMMDevice(device, address, ch); err != nil {
-			lastErr = err
-			if shouldProbeNextChannel(err) {
-				continue
-			}
-			return 0, err
+			return err
 		}
 		if err := waitForDevice(device, 2*time.Second); err != nil {
-			lastErr = err
 			_ = ReleaseRFCOMMDevice(device)
-			if shouldProbeNextChannel(err) {
-				continue
-			}
-			return 0, err
+			return err
 		}
 		_ = RememberDeviceChannel(address, ch)
-		return ch, nil
-	}
-	return 0, fmt.Errorf("no RFCOMM channel worked for %s: %w", address, lastErr)
+		return nil
+	})
 }
