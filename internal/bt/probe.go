@@ -4,6 +4,12 @@ import "fmt"
 
 type channelAttemptFunc func(channel int, attempt int) error
 
+func report(progress RFCOMMProgress, step string) {
+	if progress != nil {
+		progress(step)
+	}
+}
+
 // probeRFCOMMChannels tries channelCandidates in order until attempt returns nil.
 func probeRFCOMMChannels(preferred int, progress RFCOMMProgress, stepLabel string, attempt channelAttemptFunc) (int, error) {
 	var lastErr error

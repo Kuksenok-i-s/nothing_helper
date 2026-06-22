@@ -1,3 +1,5 @@
+//go:build linux
+
 package notify
 
 import (
@@ -163,7 +165,7 @@ func TestProcessEventConnectAndLowBattery(t *testing.T) {
 	}
 }
 
-func TestProcessEventBatteryUpdatesInPlace(t *testing.T) {
+func TestProcessEventBatteryNoAlertWhenHealthy(t *testing.T) {
 	sv := fakeSessionView{snap: session.Snapshot{
 		Batteries: map[string]spp.Battery{
 			"left":  {Percent: 90},
@@ -171,26 +173,49 @@ func TestProcessEventBatteryUpdatesInPlace(t *testing.T) {
 		},
 	}}
 
-	var updates []string
+	calls := 0
 	n := &Notifier{
 		backend: "test",
-		send: func(_ uint32, _ Urgency, title, body, _ string) uint32 {
-			if title == "test" {
-				updates = append(updates, body)
-			}
-			return 42
+		send: func(_ uint32, _ Urgency, _, _, _ string) uint32 {
+			calls++
+			return 0
 		},
 	}
 
 	lowFired := map[string]int{}
 	processEvent(session.Event{Kind: session.EventBattery}, sv, n, Options{AppName: "test"}, earbudLowLevels, caseLowLevels, lowFired)
 
-	if len(updates) != 1 {
-		t.Fatalf("updates = %v, want one in-place battery update", updates)
+	if calls != 0 {
+		t.Fatalf("expected no notifications at healthy battery, got %d", calls)
 	}
-	want := "Left 90%   Right 80% ⚡"
-	if updates[0] != want {
-		t.Fatalf("update body = %q, want %q", updates[0], want)
+}
+
+func TestCheckLowBatteryHysteresis(t *testing.T) {
+	earbud := earbudLowLevels
+	caseLv := caseLowLevels
+	fired := map[string]int{}
+	calls := 0
+	rec := &Notifier{send: func(_ uint32, _ Urgency, _, _, _ string) uint32 { calls++; return 0 }}
+
+	data := map[string]spp.Battery{"left": {Percent: 18}}
+	checkLowBattery(rec, data, earbud, caseLv, fired)
+	if calls != 1 {
+		t.Fatalf("expected alert at 18%%, got %d", calls)
+	}
+	data["left"] = spp.Battery{Percent: 21}
+	checkLowBattery(rec, data, earbud, caseLv, fired)
+	if calls != 1 {
+		t.Fatalf("expected no repeat alert at 21%%, got %d", calls)
+	}
+	data["left"] = spp.Battery{Percent: 18}
+	checkLowBattery(rec, data, earbud, caseLv, fired)
+	if calls != 1 {
+		t.Fatalf("expected no repeat alert after oscillation, got %d", calls)
+	}
+	data["left"] = spp.Battery{Percent: 26}
+	checkLowBattery(rec, data, earbud, caseLv, fired)
+	if _, ok := fired["left"]; ok {
+		t.Fatal("expected fired cleared after recovery above threshold")
 	}
 }
 

@@ -76,7 +76,7 @@ type pendingTX struct {
 type Session struct {
 	mu           sync.Mutex
 	connectMu    sync.Mutex
-	f            *os.File
+	transport    bt.Transport
 	device       bt.Device
 	model        spp.ModelInfo
 	batteries    map[string]spp.Battery
@@ -137,7 +137,7 @@ func (s *Session) Snapshot() Snapshot {
 	for k, v := range s.config {
 		config[k] = v
 	}
-	return Snapshot{Device: s.device, Model: s.model, Batteries: batteries, DualList: dualList, Connected: s.f != nil, Config: config}
+	return Snapshot{Device: s.device, Model: s.model, Batteries: batteries, DualList: dualList, Connected: s.transport != nil, Config: config}
 }
 
 func (s *Session) SetModel(model spp.ModelInfo) {
@@ -215,9 +215,11 @@ func (s *Session) autoDetectModelFromPacketLocked(device bt.Device, pkt spp.Pack
 	}
 }
 
-func (s *Session) Connect(device bt.Device, rfcommPath string, channel int) error {
-	if _, err := security.ValidateRFCOMMDevice(rfcommPath); err != nil {
-		return err
+func (s *Session) Connect(device bt.Device, transportRef string, channel int) error {
+	if transportRef != "" {
+		if _, err := security.ValidateTransportRef(transportRef); err != nil {
+			return err
+		}
 	}
 	if err := security.ValidateChannel(channel); err != nil {
 		return err
@@ -231,25 +233,22 @@ func (s *Session) Connect(device bt.Device, rfcommPath string, channel int) erro
 	}
 
 	if device.MAC == "" {
-		if mac, ok := bt.LookupDeviceMAC(rfcommPath); ok {
+		if mac, ok := bt.LookupDeviceMAC(transportRef); ok {
 			device.MAC = mac
-			if device.Name == "" || device.Name == rfcommPath {
+			if device.Name == "" || device.Name == transportRef {
 				device.Name = mac
 			}
 		}
-	}
-	if device.MAC != "" && (device.Info == "" || device.Name == "" || strings.EqualFold(device.Name, device.MAC)) {
-		device = bt.EnrichDeviceInfo(device)
 	}
 
 	s.connectMu.Lock()
 	defer s.connectMu.Unlock()
 
 	// Idempotency guard: a second connect to the same device while a live link
-	// exists would reopen /dev/rfcommN and churn the RFCOMM session (duplicate
+	// exists would reopen transport and churn the RFCOMM session (duplicate
 	// read loops and probes), which can wedge the earbuds. Skip it.
 	s.mu.Lock()
-	alreadyConnected := s.f != nil && device.MAC != "" && s.device.MAC == device.MAC
+	alreadyConnected := s.transport != nil && device.MAC != "" && s.device.MAC == device.MAC
 	currentName := s.device.Name
 	s.mu.Unlock()
 	if alreadyConnected {
@@ -261,24 +260,32 @@ func (s *Session) Connect(device bt.Device, rfcommPath string, channel int) erro
 		return nil
 	}
 
+	if device.MAC != "" && (device.Info == "" || device.Name == "" || strings.EqualFold(device.Name, device.MAC)) {
+		device = bt.EnrichDeviceInfo(device)
+	}
+
 	progress := func(step string) {
 		s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: step})
 	}
 
 	channel = bt.ResolveDeviceChannel(device.MAC, channel)
-	s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: fmt.Sprintf("opening %s (channel %d)", rfcommPath, channel)})
-	f, usedChannel, err := bt.OpenRFCOMMDevice(rfcommPath, device.MAC, channel, progress)
+	label := transportRef
+	if label == "" && device.MAC != "" {
+		label = device.MAC
+	}
+	s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: fmt.Sprintf("opening %s (channel %d)", label, channel)})
+	transport, usedChannel, err := bt.OpenTransport(transportRef, device.MAC, channel, progress)
 	if err != nil {
 		s.publish(Event{Kind: EventError, Device: device, Error: err})
 		return err
 	}
-	s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: fmt.Sprintf("opened %s on channel %d", rfcommPath, usedChannel)})
+	s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: fmt.Sprintf("opened %s on channel %d", transport.String(), usedChannel)})
 	var modelEvent *trace.Event
 	s.mu.Lock()
-	if s.f != nil {
-		_ = s.f.Close()
+	if s.transport != nil {
+		_ = s.transport.Close()
 	}
-	s.f = f
+	s.transport = transport
 	device.Channel = usedChannel
 	s.device = device
 	s.clearLiveStateLocked()
@@ -300,12 +307,12 @@ func (s *Session) Connect(device bt.Device, rfcommPath string, channel int) erro
 		s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: "raw stream -> " + rawPath})
 	}
 	if device.MAC != "" {
-		_ = bt.RememberDeviceMAC(rfcommPath, device.MAC)
+		_ = bt.RememberDeviceMAC(transportRef, device.MAC)
 		_ = bt.RememberDeviceChannel(device.MAC, usedChannel)
 	}
 	s.publish(Event{Kind: EventConnected, Device: device, Source: "tui", Trigger: "connect"})
 	s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: "starting read loop"})
-	go s.readLoop(f)
+	go s.readLoop(transport)
 	if s.probeEnabled {
 		go s.initialProbe(device)
 	}
@@ -407,35 +414,35 @@ func (s *Session) RunQueryScan(ctx context.Context, start, end uint16, delay tim
 func (s *Session) isCurrentDevice(device bt.Device) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.f != nil && s.device.MAC == device.MAC
+	return s.transport != nil && s.device.MAC == device.MAC
 }
 
 func (s *Session) Close() error {
 	s.mu.Lock()
-	f := s.f
+	transport := s.transport
 	s.mu.Unlock()
-	if f == nil {
+	if transport == nil {
 		return nil
 	}
-	_, closeErr := s.finalizeDisconnect(f, "shutdown", "RFCOMM closed", nil)
+	_, closeErr := s.finalizeDisconnect(transport, "shutdown", "RFCOMM closed", nil)
 	return closeErr
 }
 
 // finalizeDisconnect tears down the active RFCOMM link and live session state,
 // then publishes EventDisconnected. When f is non-nil it must match s.f unless
 // another goroutine already finalized the link (stale read loop).
-func (s *Session) finalizeDisconnect(f *os.File, source, trigger string, err error) (bt.Device, error) {
+func (s *Session) finalizeDisconnect(transport bt.Transport, source, trigger string, err error) (bt.Device, error) {
 	s.mu.Lock()
-	if f != nil && s.f != f {
+	if transport != nil && s.transport != transport {
 		s.mu.Unlock()
 		return bt.Device{}, nil
 	}
-	wasConnected := s.f != nil
+	wasConnected := s.transport != nil
 	dev := s.device
 	var closeErr error
-	if s.f != nil {
-		closeErr = s.f.Close()
-		s.f = nil
+	if s.transport != nil {
+		closeErr = s.transport.Close()
+		s.transport = nil
 	}
 	if s.rawCapture != nil {
 		_ = s.rawCapture.Close()
@@ -482,15 +489,15 @@ func (s *Session) Send(pkt spp.Packet, meta Meta) error {
 	pkt.FixedFSN = true
 	raw := pkt.MarshalBinary()
 	s.mu.Lock()
-	f := s.f
-	if f == nil {
+	transport := s.transport
+	if transport == nil {
 		s.mu.Unlock()
 		return fmt.Errorf("not connected")
 	}
 	dev := s.device
 	model := s.model
 	s.pending[pkt.FSN] = pendingTX{command: fmt.Sprintf("%04x", pkt.Cmd), trigger: meta.Trigger}
-	_, err := f.Write(raw)
+	_, err := transport.Write(raw)
 	if err != nil {
 		delete(s.pending, pkt.FSN)
 		s.mu.Unlock()
@@ -554,36 +561,36 @@ func (s *Session) openRawCaptureLocked() string {
 	return path
 }
 
-func (s *Session) readLoop(f *os.File) {
+func (s *Session) readLoop(transport bt.Transport) {
 	s.publish(Event{Kind: EventProgress, Device: s.Snapshot().Device, Source: "read_loop", Trigger: "waiting for packets"})
 	s.mu.Lock()
 	rawCapture := s.rawCapture
 	s.mu.Unlock()
-	var reader io.Reader = f
+	var reader io.Reader = transport
 	if rawCapture != nil {
-		reader = io.TeeReader(f, rawCapture)
+		reader = io.TeeReader(transport, rawCapture)
 	}
 	for {
 		raw, err := spp.ReadPacket(reader)
 		if err != nil {
-			if !s.isCurrentFile(f) {
+			if !s.isCurrentTransport(transport) {
 				return
 			}
 			if err == io.EOF {
-				_, _ = s.finalizeDisconnect(f, "read_loop", "RFCOMM closed", err)
+				_, _ = s.finalizeDisconnect(transport, "read_loop", "RFCOMM closed", err)
 				return
 			}
-			_, _ = s.finalizeDisconnect(f, "read_loop", "read error", err)
+			_, _ = s.finalizeDisconnect(transport, "read_loop", "read error", err)
 			return
 		}
 		s.handleRaw(raw)
 	}
 }
 
-func (s *Session) isCurrentFile(f *os.File) bool {
+func (s *Session) isCurrentTransport(transport bt.Transport) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.f == f
+	return s.transport == transport
 }
 
 func (s *Session) handleRaw(raw []byte) {

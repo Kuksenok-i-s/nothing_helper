@@ -1,5 +1,7 @@
 # AGENTS: tws_manager
 
+> **Full agent wiki (English):** [docs/AGENT_WIKI.md](docs/AGENT_WIKI.md) — agent guide, code examples, split docs under [docs/agent/](docs/agent/).
+
 Этот файл - быстрый справочник для агентной работы по Go-части проекта.
 
 ## 1) Что это за проект
@@ -36,7 +38,7 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
 
 - `internal/notify`
  - desktop-уведомления (GNOME/freedesktop) через `gdbus`/`notify-send`, warning в stderr если backend недоступен;
- - watcher событий сессии: connect/disconnect, батарея in-place (`Notifier.Update`), low-battery alerts (20/10/5%);
+ - watcher событий сессии: connect/disconnect, low-battery alerts (20/10/5%);
  - при `--notify` без `--query-every` включается опрос батареи каждые 60 с.
 
 - `internal/ui/presenter`
@@ -114,9 +116,9 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
 
 ### Новая команда/парсер протокола
 
-1. Добавить константу/метаданные в `internal/spp/spp.go`:
-   - `commandCatalog`;
-   - при необходимости `Cmd...`.
+1. Добавить константу/метаданные в `internal/spp/`:
+   - `commands.go` — `Cmd...` константы;
+   - `battery.go` — `commandCatalog`.
 2. Добавить parser в `packetParsers` + функцию `parse...Packet`.
 3. Если это feature-команда из UI:
    - обновить `featureCommands`;
@@ -169,7 +171,7 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
 ## 8) Полезные ориентиры по коду
 
 - Wire/frame: `internal/spp/frame.go`
-- Каталог команд и parsing: `internal/spp/spp.go`
+- Каталог команд и parsing: `internal/spp/battery.go`, `internal/spp/parse_dispatch.go`
 - Safety: `internal/spp/device_safety.go`
 - Session orchestration: `internal/session/session.go`
 - RFCOMM lifecycle: `internal/bt/bt.go`

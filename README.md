@@ -12,6 +12,8 @@ This project is not affiliated with Nothing Technology Limited. Nothing/CMF name
 
 Runs **locally** on Linux: discovery via `bluetoothctl`, RFCOMM `/dev/rfcommN`, no network API.
 
+**macOS (experimental):** Gio GUI + IOBluetooth RFCOMM (no BlueZ/sudo). Build with `-tags gio systray`; bundle via `packaging/macos/bundle.sh`. Hardware validation: `cmd/spp_spike`.
+
 Example
 
 ![main window](pics/main_control.png)

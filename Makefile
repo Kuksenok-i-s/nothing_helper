@@ -1,4 +1,4 @@
-.PHONY: help install-deps install-deps-debian run run-systray run-gio run-gio-lite run-gio-systray build build-systray build-gio build-gio-lite build-gio-systray build-helper build-gio-package package-deb package-arch package-rpm install-local test fmt lint clean
+.PHONY: help install-deps install-deps-debian run run-systray run-gio run-gio-lite run-gio-systray build build-systray build-gio build-gio-lite build-gio-systray build-helper build-gio-package package-deb package-arch package-rpm package-macos install-local vet test test-race check fmt lint clean
 
 BINARY ?= tws_manager
 BINARY_GIO ?= tws_manager_gio
@@ -24,10 +24,14 @@ help:
 	@echo "  make package-deb         Build Debian package (dpkg-buildpackage)"
 	@echo "  make package-arch        Prepare Arch package (PKGBUILD)"
 	@echo "  make package-rpm         Build Fedora RPM (rpmbuild)"
+	@echo "  make package-macos       Build universal macOS .app + DMG (requires macOS + Xcode CLT)"
 	@echo "  make install-local       Install assets under /usr/local (needs sudo)"
-	@echo "  make test                Run all tests"
+	@echo "  make vet                 Run go vet ./..."
+	@echo "  make test                Run go test ./..."
+	@echo "  make test-race           Run go test -race ./..."
+	@echo "  make check               Full validation: vet + test + test-race"
 	@echo "  make fmt                 Format Go code"
-	@echo "  make lint                Run lint checks"
+	@echo "  make lint                Alias for make vet"
 	@echo "  make clean               Remove build outputs"
 	@echo ""
 	@echo "Use ARGS='...' to pass flags, for example:"
@@ -107,6 +111,11 @@ package-arch:
 package-rpm: build-gio-package
 	rpmbuild -ba packaging/fedora/tws_manager.spec
 
+# Universal arm64+x86_64 .app bundle and DMG (run on macOS with Xcode CLT).
+package-macos:
+	chmod +x packaging/macos/*.sh
+	./packaging/macos/package.sh
+
 install-local: build-gio-package
 	sudo install -Dm755 bin/$(BINARY) /usr/local/bin/$(BINARY)
 	sudo install -Dm755 bin/$(BINARY_GIO) /usr/local/bin/$(BINARY_GIO)
@@ -118,14 +127,21 @@ install-local: build-gio-package
 	sudo install -Dm644 packaging/common/90-tws_manager.rules /etc/polkit-1/rules.d/90-tws_manager.rules
 	sudo install -Dm644 packaging/common/tws_manager.sysusers /usr/lib/sysusers.d/tws_manager.conf
 
+vet:
+	go vet ./...
+
 test:
 	go test ./...
+
+test-race:
+	go test -race ./...
+
+check: vet test test-race
 
 fmt:
 	gofmt -w cmd internal
 
-lint:
-	go test ./...
+lint: vet
 
 clean:
 	rm -rf bin

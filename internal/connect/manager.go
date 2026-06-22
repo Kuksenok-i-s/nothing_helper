@@ -3,7 +3,6 @@ package connect
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"tws_manager/internal/bt"
@@ -46,18 +45,6 @@ func (m *Manager) Discover(ctx context.Context) ([]bt.Device, error) {
 	return bt.Discover()
 }
 
-// RFCOMMExists reports whether the configured RFCOMM device node exists.
-func (m *Manager) RFCOMMExists() (bool, error) {
-	_, err := os.Stat(m.opts.RFCOMMPath)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, fmt.Errorf("check %q: %w", m.opts.RFCOMMPath, err)
-}
-
 // DeviceFromAddress builds a device from an explicit MAC (e.g. --addr).
 func DeviceFromAddress(address string, channel int) (bt.Device, error) {
 	mac, err := security.NormalizeMAC(address)
@@ -83,29 +70,6 @@ func (m *Manager) DeviceForExistingRFCOMM(address string) bt.Device {
 		dev.Name = m.opts.RFCOMMPath
 	}
 	return dev
-}
-
-// Bind creates the RFCOMM device node for the given Bluetooth device.
-func (m *Manager) Bind(ctx context.Context, device bt.Device) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if device.MAC == "" {
-		return fmt.Errorf("device MAC is required to bind %s", m.opts.RFCOMMPath)
-	}
-	ch := bt.ResolveDeviceChannel(device.MAC, device.Channel)
-	if ch == 0 {
-		ch = m.opts.Channel
-	}
-	usedChannel, err := bt.BindRFCOMMWithProbe(m.opts.RFCOMMPath, device.MAC, ch, nil)
-	if err != nil {
-		return err
-	}
-	device.Channel = usedChannel
-	if err := bt.RememberDeviceMAC(m.opts.RFCOMMPath, device.MAC); err != nil {
-		return fmt.Errorf("save device mapping: %w", err)
-	}
-	return nil
 }
 
 // Connect opens the RFCOMM session for device via session.Connect.
@@ -140,8 +104,7 @@ func (m *Manager) SwitchTo(ctx context.Context, device bt.Device) error {
 		return nil
 	}
 	_ = m.sess.Close()
-	// Release any stale node so bind targets the chosen peer ("not bound" is ok).
-	_ = bt.ReleaseRFCOMMDevice(m.opts.RFCOMMPath)
+	_ = m.releaseTransportNode()
 	if err := m.Bind(ctx, device); err != nil {
 		return err
 	}

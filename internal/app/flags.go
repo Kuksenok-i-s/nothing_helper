@@ -35,15 +35,9 @@ type FlagValues struct {
 // RegisterFlags defines shared flags and applies profile-specific defaults.
 func RegisterFlags(fs *flag.FlagSet, profile Profile) *FlagValues {
 	v := &FlagValues{}
-	autoDefault := false
-	notifyDefault := false
-	privDefault := "sudo"
-	if profile == ProfileGUI {
-		autoDefault = true
-		notifyDefault = true
-		privDefault = "auto"
-	}
-	fs.StringVar(&v.DevicePath, "device", "/dev/rfcomm0", "RFCOMM device")
+	applyProfileDefaults(fs, v, profile)
+	autoDefault := profile == ProfileGUI
+	notifyDefault := profile == ProfileGUI
 	fs.StringVar(&v.Address, "addr", "", "Bluetooth device MAC; skips discovery and binds/open RFCOMM")
 	fs.IntVar(&v.Channel, "channel", 15, "RFCOMM channel used when creating --device with --addr")
 	fs.StringVar(&v.TracePath, "log", "", "write TX/RX trace events as NDJSON")
@@ -55,7 +49,6 @@ func RegisterFlags(fs *flag.FlagSet, profile Profile) *FlagValues {
 	fs.StringVar(&v.CaptureDir, "capture-dir", "captures", "directory for JSON packet exports")
 	fs.BoolVar(&v.AutoDiscover, "auto", autoDefault, "auto-discover and connect to a Nothing device")
 	fs.BoolVar(&v.Notify, "notify", notifyDefault, "show desktop notifications for battery/connection events")
-	fs.StringVar(&v.PrivilegeHelper, "privilege-helper", privDefault, "privilege backend for rfcomm operations: sudo|polkit|auto|none")
 	fs.StringVar(&v.PrivilegeHelperPath, "privilege-helper-path", "", "optional absolute path to polkit helper binary")
 	fs.StringVar(&v.PCPrimary, "pc-primary", "ask", "dual PC-primary policy: ask|off")
 	return v

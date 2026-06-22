@@ -18,9 +18,11 @@ var (
 	rfcommNumPattern = regexp.MustCompile(`^[0-9]+$`)
 )
 
-// NormalizeMAC returns uppercase MAC or error.
+// NormalizeMAC returns uppercase colon-separated MAC or error.
+// Accepts colon (Linux/BlueZ) and dash (macOS IOBluetooth) separators.
 func NormalizeMAC(mac string) (string, error) {
 	mac = strings.TrimSpace(mac)
+	mac = strings.ReplaceAll(mac, "-", ":")
 	if !macPattern.MatchString(mac) {
 		return "", fmt.Errorf("invalid Bluetooth MAC %q", mac)
 	}

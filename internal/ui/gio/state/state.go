@@ -158,7 +158,7 @@ func New(ctx context.Context, w *app.Window, opts config.Options, sess *session.
 	s.SudoPassword.SingleLine = true
 	s.SudoPassword.Submit = true
 	s.SudoPassword.Mask = '*'
-	bt.ConfigureSudoPasswordProvider(s.promptSudoPassword)
+	s.configurePlatformHooks()
 	snap := sess.Snapshot()
 	s.commands = presenter.BuildCommands(snap.Model, snap.DualList, opts.AllowUnsafe)
 	s.syncCmdButtons()

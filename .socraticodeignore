@@ -1,0 +1,16 @@
+# SocratiCode index exclusions for nothing_helper (tws_manager).
+# Syntax matches .gitignore. Applied after built-in defaults and .gitignore.
+
+# Runtime session captures (NDJSON traces with optional raw bytes)
+captures/
+
+# UI screenshots — binary assets, not useful for semantic code search
+pics/
+
+# Arch packaging build outputs (also listed in .gitignore)
+packaging/arch/pkg/
+packaging/arch/src/
+packaging/arch/*.pkg.tar.*
+
+# SocratiCode bootstrap script dependencies (node_modules is also a built-in default)
+scripts/node_modules/

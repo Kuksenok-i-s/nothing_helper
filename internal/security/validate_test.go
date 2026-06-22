@@ -13,6 +13,10 @@ func TestValidateMAC(t *testing.T) {
 	if err != nil || mac != "AA:BB:CC:DD:EE:FF" {
 		t.Fatalf("NormalizeMAC() = %q, %v", mac, err)
 	}
+	mac, err = NormalizeMAC("aa-bb-cc-dd-ee-ff")
+	if err != nil || mac != "AA:BB:CC:DD:EE:FF" {
+		t.Fatalf("NormalizeMAC(dash) = %q, %v", mac, err)
+	}
 	if err := ValidateMAC("not-a-mac"); err == nil {
 		t.Fatal("expected error for invalid MAC")
 	}

@@ -1,0 +1,12 @@
+# macOS-only Bluetooth research scripts (scripts/macos/*.py).
+# Python 3.9: use 10.3.x wheels. Python 3.10+: can use >=11.
+# Install:
+#   python3 -m venv scripts/macos/.venv
+#   source scripts/macos/.venv/bin/activate
+#   pip install -r scripts/macos/requirements.txt
+pyobjc-core==10.3.2; python_version < "3.10"
+pyobjc-framework-Cocoa==10.3.2; python_version < "3.10"
+pyobjc-framework-IOBluetooth==10.3.2; python_version < "3.10"
+pyobjc-core>=11.1; python_version >= "3.10"
+pyobjc-framework-Cocoa>=11.1; python_version >= "3.10"
+pyobjc-framework-IOBluetooth>=11.1; python_version >= "3.10"

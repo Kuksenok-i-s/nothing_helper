@@ -42,8 +42,8 @@ type Options struct {
 }
 
 // Run subscribes to session events and emits desktop notifications for
-// connect/disconnect, in-place battery levels, and low-battery warnings. It
-// returns when ctx is cancelled or the event stream closes.
+// connect/disconnect and low-battery warnings. It returns when ctx is cancelled
+// or the event stream closes.
 func Run(ctx context.Context, s *session.Session, opts Options) {
 	if opts.AppName == "" {
 		opts.AppName = "tws_manager"
@@ -96,11 +96,7 @@ func processEvent(ev session.Event, sv sessionView, n *Notifier, opts Options, e
 		clear(lowFired)
 		n.Alert(UrgencyNormal, opts.AppName, "Disconnected")
 	case session.EventBattery:
-		batteries := sv.Snapshot().Batteries
-		if body := formatBatteries(batteries); body != "" {
-			n.Update(opts.AppName, body)
-		}
-		checkLowBattery(n, batteries, earbudLevels, caseLevels, lowFired)
+		checkLowBattery(n, sv.Snapshot().Batteries, earbudLevels, caseLevels, lowFired)
 	}
 }
 
@@ -126,7 +122,11 @@ func checkLowBattery(n *Notifier, data map[string]spp.Battery, earbudLevels, cas
 			}
 		}
 		if hit == nil {
-			delete(fired, comp)
+			// Require recovery above the last fired threshold before alerting again
+			// (avoids repeat alerts when percent oscillates around a threshold).
+			if prev, ok := fired[comp]; ok && b.Percent > prev+5 {
+				delete(fired, comp)
+			}
 			continue
 		}
 		if prev, ok := fired[comp]; ok && prev <= hit.percent {

@@ -76,13 +76,13 @@ func TestRawStreamCaptureTeesIncomingBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.mu.Lock()
-	s.f = pr
+	s.transport = bt.NewTestTransport(pr, "", 15, "/dev/rfcomm0")
 	rawPath := s.openRawCaptureLocked()
 	s.mu.Unlock()
 	if rawPath == "" {
 		t.Fatal("openRawCaptureLocked returned empty path")
 	}
-	go s.readLoop(pr)
+	go s.readLoop(s.transport)
 
 	frame := spp.BuildFrame(spp.ControlCRC|spp.ControlMultiFrame, spp.CmdRspBattery, 1, []byte{0x02, 0x46})
 	if _, err := pw.Write(frame); err != nil {
@@ -176,20 +176,21 @@ func TestConnectIdempotentWhenAlreadyConnected(t *testing.T) {
 	}
 	defer f.Close()
 	s.mu.Lock()
-	s.f = f
+	transport := bt.NewTestTransport(f, "2C:BE:EE:4A:EC:9E", 15, "/dev/rfcomm0")
+	s.transport = transport
 	s.device = bt.Device{MAC: "2C:BE:EE:4A:EC:9E", Name: "Nothing Ear (3)"}
 	s.mu.Unlock()
 
 	// A second connect to the same MAC must be a no-op (no reopen, no error).
-	err = s.Connect(bt.Device{MAC: "2c:be:ee:4a:ec:9e"}, "/dev/rfcomm0", 15)
+	err = s.Connect(bt.Device{MAC: "2c:be:ee:4a:ec:9e"}, "2C:BE:EE:4A:EC:9E", 15)
 	if err != nil {
 		t.Fatalf("idempotent connect returned error: %v", err)
 	}
 	s.mu.Lock()
-	stillSame := s.f == f
+	stillSame := s.transport == transport
 	s.mu.Unlock()
 	if !stillSame {
-		t.Fatal("session file handle was replaced by redundant connect")
+		t.Fatal("session transport was replaced by redundant connect")
 	}
 }
 
@@ -223,7 +224,7 @@ func TestFinalizeDisconnectOnEOF(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.mu.Lock()
-	s.f = pr
+	s.transport = bt.NewTestTransport(pr, "AA:BB:CC:DD:EE:FF", 15, "/dev/rfcomm0")
 	s.device = bt.Device{MAC: "AA:BB:CC:DD:EE:FF", Name: "Nothing Ear"}
 	s.batteries = map[string]spp.Battery{"left": {Percent: 80}}
 	s.config = map[string]string{"anc": "on"}
@@ -231,7 +232,7 @@ func TestFinalizeDisconnectOnEOF(t *testing.T) {
 	s.model, _ = spp.ResolveModelInfo("EarThree")
 	s.mu.Unlock()
 
-	go s.readLoop(pr)
+	go s.readLoop(s.transport)
 	_ = pw.Close()
 
 	deadline := time.After(2 * time.Second)
@@ -326,7 +327,7 @@ func TestSendLeavesPendingAfterSuccessfulWrite(t *testing.T) {
 	}
 
 	s.mu.Lock()
-	s.f = f
+	s.transport = bt.NewTestTransport(f, "AA:BB:CC:DD:EE:FF", 15, "/dev/rfcomm0")
 	s.device = bt.Device{MAC: "AA:BB:CC:DD:EE:FF", Name: "Nothing Ear"}
 	s.mu.Unlock()
 
@@ -351,7 +352,7 @@ func TestSendRemovesPendingOnWriteError(t *testing.T) {
 	_ = f.Close()
 
 	s.mu.Lock()
-	s.f = f
+	s.transport = bt.NewTestTransport(f, "AA:BB:CC:DD:EE:FF", 15, "/dev/rfcomm0")
 	s.device = bt.Device{MAC: "AA:BB:CC:DD:EE:FF", Name: "Nothing Ear"}
 	s.mu.Unlock()
 
@@ -373,7 +374,7 @@ func TestConnectClearsLiveStateOnDeviceSwitch(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.mu.Lock()
-	s.f = f
+	s.transport = bt.NewTestTransport(f, "AA:BB:CC:DD:EE:FF", 15, "/dev/rfcomm0")
 	s.device = bt.Device{MAC: "AA:BB:CC:DD:EE:FF", Name: "Ear A"}
 	s.batteries = map[string]spp.Battery{"left": {Percent: 80}}
 	s.config = map[string]string{"anc": "on"}
@@ -386,10 +387,10 @@ func TestConnectClearsLiveStateOnDeviceSwitch(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.mu.Lock()
-	if s.f != nil {
-		_ = s.f.Close()
+	if s.transport != nil {
+		_ = s.transport.Close()
 	}
-	s.f = f2
+	s.transport = bt.NewTestTransport(f2, "BB:CC:DD:EE:FF:00", 15, "/dev/rfcomm1")
 	s.device = bt.Device{MAC: "BB:CC:DD:EE:FF:00", Name: "Ear B"}
 	s.clearLiveStateLocked()
 	s.mu.Unlock()

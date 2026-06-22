@@ -11,7 +11,6 @@
 .env.production/
 .socraticode.json
 .socraticodecontextartifacts.json
-docs/
 captures/
 bin/
 build/
@@ -22,6 +21,9 @@ dist/
 *.rpm
 *.pkg.tar.zst
 *.pkg.tar.xz
+*.dmg
 packaging/arch/pkg/
 packaging/arch/src/
 packaging/arch/*.pkg.tar.*
+scripts/node_modules/
+scripts/macos/.venv/

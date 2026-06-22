@@ -1,13 +1,13 @@
+//go:build linux
+
 package bt
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,31 +18,6 @@ import (
 
 	"tws_manager/internal/security"
 )
-
-const (
-	NothingSPPUUID  = "AEAC4A03-DFF5-498F-843A-34487CF133EB"
-	privateDirPerm  = 0o700
-	privateFilePerm = 0o600
-)
-
-type Device struct {
-	MAC       string `json:"mac"`
-	Name      string `json:"name"`
-	Alias     string `json:"alias,omitempty"`
-	Info      string `json:"info,omitempty"`
-	Connected bool   `json:"connected"`
-	Paired    bool   `json:"paired"`
-	SPP       bool   `json:"spp"`
-	Channel   int    `json:"channel"`
-}
-
-type Config struct {
-	Devices  map[string]string `json:"devices"`
-	Channels map[string]int    `json:"channels,omitempty"`
-}
-
-// RFCOMMProgress reports recovery steps (release, bind, reopen).
-type RFCOMMProgress func(step string)
 
 var (
 	sudoMu          sync.Mutex
@@ -144,17 +119,6 @@ func EnrichDeviceInfo(dev Device) Device {
 	dev.Info = info
 	applyBluetoothInfo(&dev, info)
 	return dev
-}
-
-func isCandidate(dev Device) bool {
-	name := strings.ToLower(dev.Name)
-	alias := strings.ToLower(dev.Alias)
-	for _, token := range []string{"nothing", "cmf", "ear", "headphone", "neckband"} {
-		if strings.Contains(name, token) || strings.Contains(alias, token) {
-			return true
-		}
-	}
-	return false
 }
 
 // WarmupSudo prompts once for credentials (sudo -v) so later privileged ops can use sudo -n.
@@ -311,12 +275,6 @@ func validateRFCCOMMBind(device, address string, channel int) (string, string, i
 		return "", "", 0, err
 	}
 	return devPath, mac, channel, nil
-}
-
-func report(progress RFCOMMProgress, step string) {
-	if progress != nil {
-		progress(step)
-	}
 }
 
 func waitForDevice(device string, timeout time.Duration) error {
@@ -491,13 +449,16 @@ func isRecoverableRFCOMMOpenError(err error) bool {
 		errors.Is(err, syscall.ENOTCONN)
 }
 
-// OpenRFCOMMDevice opens an RFCOMM tty, probing alternate channels when the
+// OpenTransport opens an RFCOMM tty, probing alternate channels when the
 // preferred one fails. Returns the channel that worked.
-func OpenRFCOMMDevice(device, address string, channel int, progress RFCOMMProgress) (*os.File, int, error) {
+func OpenTransport(device, address string, channel int, progress RFCOMMProgress) (Transport, int, error) {
 	channel = ResolveDeviceChannel(address, channel)
 	if address == "" {
-		f, err := openRFCOMMOnChannel(device, address, channel, progress)
-		return f, channel, err
+		t, err := openRFCOMMOnChannel(device, address, channel, progress)
+		if err != nil {
+			return nil, channel, err
+		}
+		return newRWCTransport(t, "", channel, device), channel, nil
 	}
 	var opened *os.File
 	usedChannel, err := probeRFCOMMChannels(channel, progress, "trying", func(ch, attempt int) error {
@@ -515,7 +476,13 @@ func OpenRFCOMMDevice(device, address string, channel int, progress RFCOMMProgre
 	if err != nil {
 		return nil, 0, err
 	}
-	return opened, usedChannel, nil
+	mac := address
+	if mac == "" {
+		if m, ok := LookupDeviceMAC(device); ok {
+			mac = m
+		}
+	}
+	return newRWCTransport(opened, mac, usedChannel, device), usedChannel, nil
 }
 
 func openRFCOMMOnChannel(device, address string, channel int, progress RFCOMMProgress) (*os.File, error) {
@@ -640,109 +607,4 @@ func setRawMode(f *os.File) {
 	t.Cc[unix.VMIN] = 1
 	t.Cc[unix.VTIME] = 0
 	_ = unix.IoctlSetTermios(fd, unix.TCSETS, t)
-}
-
-func ConfigPath() string {
-	if dir, err := os.UserConfigDir(); err == nil {
-		return filepath.Join(dir, "tws_manager", "devices.json")
-	}
-	return filepath.Join(".", "devices.json")
-}
-
-func LoadConfig(path string) (Config, error) {
-	return loadConfigCached(path)
-}
-
-func loadConfigFromDisk(path string) (Config, error) {
-	cfg := Config{Devices: map[string]string{}, Channels: map[string]int{}}
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return cfg, nil
-	}
-	if err != nil {
-		return cfg, err
-	}
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return cfg, err
-	}
-	return sanitizeConfig(cfg), nil
-}
-
-func sanitizeConfig(cfg Config) Config {
-	out := Config{Devices: map[string]string{}, Channels: map[string]int{}}
-	if cfg.Devices != nil {
-		for path, mac := range cfg.Devices {
-			devPath, err := security.ValidateRFCOMMDevice(path)
-			if err != nil {
-				continue
-			}
-			normMAC, err := security.NormalizeMAC(mac)
-			if err != nil {
-				continue
-			}
-			out.Devices[devPath] = normMAC
-		}
-	}
-	if cfg.Channels != nil {
-		for mac, channel := range cfg.Channels {
-			normMAC, err := security.NormalizeMAC(mac)
-			if err != nil {
-				continue
-			}
-			if err := security.ValidateChannel(channel); err != nil {
-				continue
-			}
-			out.Channels[normMAC] = channel
-		}
-	}
-	return out
-}
-
-func SaveConfig(path string, cfg Config) error {
-	cfg = sanitizeConfig(cfg)
-	if err := os.MkdirAll(filepath.Dir(path), privateDirPerm); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(path, append(data, '\n'), privateFilePerm); err != nil {
-		return err
-	}
-	invalidateConfigCache(path)
-	return nil
-}
-
-// LookupDeviceMAC returns a saved MAC for an RFCOMM device path.
-func LookupDeviceMAC(devicePath string) (string, bool) {
-	devPath, err := security.ValidateRFCOMMDevice(devicePath)
-	if err != nil {
-		return "", false
-	}
-	cfg, err := LoadConfig(ConfigPath())
-	if err != nil {
-		return "", false
-	}
-	mac, ok := cfg.Devices[devPath]
-	return mac, ok && mac != ""
-}
-
-// RememberDeviceMAC persists devicePath -> MAC for later revive without --addr.
-func RememberDeviceMAC(devicePath, mac string) error {
-	devPath, err := security.ValidateRFCOMMDevice(devicePath)
-	if err != nil {
-		return err
-	}
-	normMAC, err := security.NormalizeMAC(mac)
-	if err != nil {
-		return err
-	}
-	path := ConfigPath()
-	cfg, err := LoadConfig(path)
-	if err != nil {
-		return err
-	}
-	cfg.Devices[devPath] = normMAC
-	return SaveConfig(path, cfg)
 }
