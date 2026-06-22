@@ -2,7 +2,9 @@
 
 package audio
 
-// IsDefaultOutputForMAC is not implemented on macOS; returns false without error.
+// IsDefaultOutputForMAC on macOS always returns true: IOBluetooth RFCOMM does not
+// require the earbuds to be the system default audio output (unlike Linux/BlueZ).
 func IsDefaultOutputForMAC(mac string) (bool, error) {
-	return false, nil
+	_ = mac
+	return true, nil
 }

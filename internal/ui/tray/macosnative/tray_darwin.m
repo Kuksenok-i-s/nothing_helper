@@ -33,6 +33,12 @@ static NSMenuItem *add_action_item(NSMenu *menu, NSString *title, int tag) {
 
 void tray_darwin_schedule_init(const char *tooltip, const void *iconData, int iconLen,
                                int showWindow, int showReconnect) {
+  NSString *tooltipStr = tooltip ? @(tooltip) : @"tws_manager";
+  NSData *iconCopy = nil;
+  if (iconData != NULL && iconLen > 0) {
+    iconCopy = [NSData dataWithBytes:iconData length:iconLen];
+  }
+
   dispatch_async(dispatch_get_main_queue(), ^{
     if (statusItem != nil) {
       return;
@@ -68,12 +74,9 @@ void tray_darwin_schedule_init(const char *tooltip, const void *iconData, int ic
     add_action_item(menu, @"Quit", 5);
 
     [statusItem setMenu:menu];
-    if (tooltip != NULL) {
-      statusItem.button.toolTip = @(tooltip);
-    }
-    if (iconData != NULL && iconLen > 0) {
-      NSData *data = [NSData dataWithBytes:iconData length:iconLen];
-      NSImage *image = [[NSImage alloc] initWithData:data];
+    statusItem.button.toolTip = tooltipStr;
+    if (iconCopy != nil) {
+      NSImage *image = [[NSImage alloc] initWithData:iconCopy];
       if (image != nil) {
         [image setSize:NSMakeSize(16, 16)];
         image.template = YES;
@@ -84,28 +87,37 @@ void tray_darwin_schedule_init(const char *tooltip, const void *iconData, int ic
 }
 
 void tray_darwin_set_status(const char *title) {
-  if (title == NULL || statusMenuItem == nil) {
+  if (title == NULL) {
     return;
   }
+  NSString *s = @(title);
   dispatch_async(dispatch_get_main_queue(), ^{
-    statusMenuItem.title = @(title);
+    if (statusMenuItem != nil) {
+      statusMenuItem.title = s;
+    }
   });
 }
 
 void tray_darwin_set_battery(const char *title) {
-  if (title == NULL || batteryMenuItem == nil) {
+  if (title == NULL) {
     return;
   }
+  NSString *s = @(title);
   dispatch_async(dispatch_get_main_queue(), ^{
-    batteryMenuItem.title = @(title);
+    if (batteryMenuItem != nil) {
+      batteryMenuItem.title = s;
+    }
   });
 }
 
 void tray_darwin_set_tooltip(const char *tooltip) {
-  if (tooltip == NULL || statusItem == nil) {
+  if (tooltip == NULL) {
     return;
   }
+  NSString *s = @(tooltip);
   dispatch_async(dispatch_get_main_queue(), ^{
-    statusItem.button.toolTip = @(tooltip);
+    if (statusItem != nil) {
+      statusItem.button.toolTip = s;
+    }
   });
 }

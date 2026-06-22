@@ -46,7 +46,7 @@ func RegisterFlags(fs *flag.FlagSet, profile Profile) *FlagValues {
 	fs.BoolVar(&v.NoProbe, "no-probe", false, "skip automatic identity/battery probes after connect")
 	fs.BoolVar(&v.LogRaw, "log-raw", false, "include raw packet bytes in trace/export logs")
 	fs.DurationVar(&v.QueryEvery, "query-every", 0, "send GET_BATTERY periodically, e.g. 30s")
-	fs.StringVar(&v.CaptureDir, "capture-dir", "captures", "directory for JSON packet exports")
+	fs.StringVar(&v.CaptureDir, "capture-dir", captureDirDefault(profile), "directory for JSON packet exports")
 	fs.BoolVar(&v.AutoDiscover, "auto", autoDefault, "auto-discover and connect to a Nothing device")
 	fs.BoolVar(&v.Notify, "notify", notifyDefault, "show desktop notifications for battery/connection events")
 	fs.StringVar(&v.PrivilegeHelperPath, "privilege-helper-path", "", "optional absolute path to polkit helper binary")

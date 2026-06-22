@@ -4,12 +4,12 @@ package audio
 
 import "testing"
 
-func TestIsDefaultOutputForMACStub(t *testing.T) {
+func TestIsDefaultOutputForMACDarwinSkipsGate(t *testing.T) {
 	ok, err := IsDefaultOutputForMAC("aa:bb:cc:dd:ee:ff")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ok {
-		t.Fatal("darwin stub should return false")
+	if !ok {
+		t.Fatal("darwin should skip audio-output gate for RFCOMM connect")
 	}
 }
