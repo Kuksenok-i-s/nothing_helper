@@ -8,6 +8,11 @@ static const NSTimeInterval kConnectTimeoutSec = 1.0;
 static const NSTimeInterval kCloseDrainSec = 0.5;
 static const NSTimeInterval kOpenRetryDrainSec = 1.0;
 static const int kOpenMaxAttempts = 3;
+// Idle slice for the read run-loop pump. CFRunLoopRunInMode returns as soon as a
+// Bluetooth source fires (returnAfterSourceHandled = YES), so this only bounds how
+// often we wake to re-check the deadline while no data is arriving. A coarse slice
+// keeps idle CPU near zero; a tiny slice (e.g. 10ms) burns CPU spinning ~100x/sec.
+static const NSTimeInterval kReadPumpSliceSec = 0.1;
 
 @interface BTRFCOMMDelegate : NSObject <IOBluetoothRFCOMMChannelDelegate>
 @property (nonatomic, assign) int handle;
@@ -460,7 +465,7 @@ int bt_transport_read(int handle, uint8_t *buf, int buflen, int timeout_ms) {
         return -1;
     }
     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout_ms / 1000.0];
-    while ([deadline timeIntervalSinceNow] > 0) {
+    for (;;) {
         [gLock lock];
         NSMutableData *data = gReadBuffers[@(handle)];
         if (data.length > 0) {
@@ -471,9 +476,15 @@ int bt_transport_read(int handle, uint8_t *buf, int buflen, int timeout_ms) {
             return (int)n;
         }
         [gLock unlock];
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, YES);
+        NSTimeInterval remaining = [deadline timeIntervalSinceNow];
+        if (remaining <= 0) {
+            return 0;
+        }
+        // Sleep until a Bluetooth source fires or the slice elapses, whichever is
+        // first. Returns immediately on incoming data, so latency is unaffected.
+        NSTimeInterval slice = remaining < kReadPumpSliceSec ? remaining : kReadPumpSliceSec;
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, slice, YES);
     }
-    return 0;
 }
 
 int bt_transport_write(int handle, const uint8_t *data, int len) {
