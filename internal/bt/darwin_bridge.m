@@ -8,11 +8,10 @@ static const NSTimeInterval kConnectTimeoutSec = 1.0;
 static const NSTimeInterval kCloseDrainSec = 0.5;
 static const NSTimeInterval kOpenRetryDrainSec = 1.0;
 static const int kOpenMaxAttempts = 3;
-// Idle slice for the read run-loop pump. CFRunLoopRunInMode returns as soon as a
-// Bluetooth source fires (returnAfterSourceHandled = YES), so this only bounds how
-// often we wake to re-check the deadline while no data is arriving. A coarse slice
-// keeps idle CPU near zero; a tiny slice (e.g. 10ms) burns CPU spinning ~100x/sec.
-static const NSTimeInterval kReadPumpSliceSec = 0.1;
+// bt_transport_read blocks on NSCondition until RFCOMM data arrives. Do not pump
+// CFRunLoopRunInMode from Go reader threads: sample(1) showed heavy CPU in
+// __CFRunLoopCopyMode when that was used for idle polling.
+static const NSTimeInterval kReadWaitSliceSec = 1.0;
 
 @interface BTRFCOMMDelegate : NSObject <IOBluetoothRFCOMMChannelDelegate>
 @property (nonatomic, assign) int handle;
@@ -25,6 +24,7 @@ static NSLock *gLock;
 static NSLock *gOpenLock;
 static NSMutableDictionary<NSNumber *, IOBluetoothRFCOMMChannel *> *gChannels;
 static NSMutableDictionary<NSNumber *, NSMutableData *> *gReadBuffers;
+static NSMutableDictionary<NSNumber *, NSCondition *> *gReadConds;
 static NSMutableDictionary<NSNumber *, BTRFCOMMDelegate *> *gDelegates;
 static int gNextHandle = 1;
 static BOOL gInitialized = NO;
@@ -34,12 +34,19 @@ static BOOL gInitialized = NO;
 - (void)rfcommChannelData:(IOBluetoothRFCOMMChannel *)rfcommChannel data:(void *)dataPointer length:(size_t)dataLength {
     (void)rfcommChannel;
     NSData *chunk = [NSData dataWithBytes:dataPointer length:dataLength];
+    NSCondition *cond = nil;
     [gLock lock];
     NSMutableData *buf = gReadBuffers[@(self.handle)];
     if (buf) {
         [buf appendData:chunk];
     }
+    cond = gReadConds[@(self.handle)];
     [gLock unlock];
+    if (cond) {
+        [cond lock];
+        [cond signal];
+        [cond unlock];
+    }
 }
 
 - (void)rfcommChannelClosed:(IOBluetoothRFCOMMChannel *)rfcommChannel {
@@ -63,6 +70,7 @@ static void ensureInit(void) {
     gOpenLock = [[NSLock alloc] init];
     gChannels = [NSMutableDictionary dictionary];
     gReadBuffers = [NSMutableDictionary dictionary];
+    gReadConds = [NSMutableDictionary dictionary];
     gDelegates = [NSMutableDictionary dictionary];
     gInitialized = YES;
 }
@@ -219,6 +227,7 @@ void bt_shutdown(void) {
         }
         [gChannels removeAllObjects];
         [gReadBuffers removeAllObjects];
+        [gReadConds removeAllObjects];
         [gDelegates removeAllObjects];
         [gLock unlock];
     });
@@ -443,6 +452,7 @@ int bt_open_rfcomm(const char *mac, int channel, bt_transport_handle *out) {
                         gDelegates[@(handle)] = delegate;
                         gChannels[@(handle)] = rfcomm;
                         gReadBuffers[@(handle)] = [NSMutableData data];
+                        gReadConds[@(handle)] = [[NSCondition alloc] init];
                         [gLock unlock];
                         memset(out, 0, sizeof(*out));
                         out->handle = handle;
@@ -468,6 +478,11 @@ int bt_transport_read(int handle, uint8_t *buf, int buflen, int timeout_ms) {
     for (;;) {
         [gLock lock];
         NSMutableData *data = gReadBuffers[@(handle)];
+        NSCondition *cond = gReadConds[@(handle)];
+        if (!data || !cond) {
+            [gLock unlock];
+            return -1;
+        }
         if (data.length > 0) {
             NSUInteger n = MIN((NSUInteger)buflen, data.length);
             [data getBytes:buf length:n];
@@ -475,15 +490,17 @@ int bt_transport_read(int handle, uint8_t *buf, int buflen, int timeout_ms) {
             [gLock unlock];
             return (int)n;
         }
+        [cond lock];
         [gLock unlock];
+
         NSTimeInterval remaining = [deadline timeIntervalSinceNow];
         if (remaining <= 0) {
+            [cond unlock];
             return 0;
         }
-        // Sleep until a Bluetooth source fires or the slice elapses, whichever is
-        // first. Returns immediately on incoming data, so latency is unaffected.
-        NSTimeInterval slice = remaining < kReadPumpSliceSec ? remaining : kReadPumpSliceSec;
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, slice, YES);
+        NSTimeInterval slice = remaining < kReadWaitSliceSec ? remaining : kReadWaitSliceSec;
+        [cond waitUntilDate:[NSDate dateWithTimeIntervalSinceNow:slice]];
+        [cond unlock];
     }
 }
 
@@ -513,10 +530,17 @@ int bt_transport_close(int handle) {
         [gLock lock];
         IOBluetoothRFCOMMChannel *ch = gChannels[@(handle)];
         BTRFCOMMDelegate *delegate = gDelegates[@(handle)];
+        NSCondition *cond = gReadConds[@(handle)];
         [gChannels removeObjectForKey:@(handle)];
         [gReadBuffers removeObjectForKey:@(handle)];
+        [gReadConds removeObjectForKey:@(handle)];
         [gDelegates removeObjectForKey:@(handle)];
         [gLock unlock];
+        if (cond) {
+            [cond lock];
+            [cond broadcast];
+            [cond unlock];
+        }
         if (ch) {
             if (delegate) {
                 delegate.closeDone = NO;

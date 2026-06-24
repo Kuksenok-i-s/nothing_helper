@@ -41,7 +41,10 @@ func (s *State) Handle(actions ...Action) {
 
 // runAutoReconnectLoop repeatedly discovers and connects while the link is down.
 func (s *State) runAutoReconnectLoop() {
-	s.manager.AutoConnect(s.ctx, connect.AutoOptions{OnStatus: s.SetStatus})
+	s.manager.AutoConnect(s.ctx, connect.AutoOptions{
+		Interval: 10 * time.Second,
+		OnStatus: s.SetStatus,
+	})
 }
 
 // doAuto searches for available headphones and connects to the best candidate
@@ -135,7 +138,6 @@ func (s *State) doDiscover() {
 	go func() {
 		devs, err := s.manager.Discover(s.ctx)
 		s.mu.Lock()
-		defer s.mu.Unlock()
 		if err != nil {
 			s.presenter.Err = err.Error()
 		} else {
@@ -147,6 +149,7 @@ func (s *State) doDiscover() {
 			s.presenter.Status = fmt.Sprintf("found %d device(s)", len(devs))
 			s.presenter.Err = ""
 		}
+		s.mu.Unlock()
 		s.invalidate()
 	}()
 }

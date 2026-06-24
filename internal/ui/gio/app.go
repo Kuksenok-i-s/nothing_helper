@@ -163,6 +163,7 @@ func runWindow(ctx context.Context, w *app.Window, st *state.State, opts Options
 				w.Perform(system.ActionClose)
 				continue
 			}
+			st.BeginFrame()
 			gtx := app.NewContext(&ops, e)
 			view.Layout(gtx, th, st)
 			e.Frame(gtx.Ops)

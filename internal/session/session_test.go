@@ -457,3 +457,32 @@ func TestPublishDeliversPriorityEventsWhenBufferFull(t *testing.T) {
 		t.Fatal("timeout waiting for priority battery event")
 	}
 }
+
+func TestPublishPriorityDoesNotBlockWhenSubscriberFull(t *testing.T) {
+	s := New(nil, false, false)
+	events := s.Subscribe()
+	for i := 0; i < cap(events); i++ {
+		s.publish(Event{Kind: EventProgress, Trigger: "fill"})
+	}
+
+	done := make(chan struct{})
+	go func() {
+		s.publish(Event{Kind: EventBattery, Parsed: spp.ParsedPacket{Summary: "battery"}})
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("priority publish blocked behind full subscriber buffer")
+	}
+}
+
+func TestShouldSendBatteryPollRequiresConnection(t *testing.T) {
+	if shouldSendBatteryPoll(Snapshot{}) {
+		t.Fatal("battery poll should be skipped while disconnected")
+	}
+	if !shouldSendBatteryPoll(Snapshot{Connected: true}) {
+		t.Fatal("battery poll should run while connected")
+	}
+}

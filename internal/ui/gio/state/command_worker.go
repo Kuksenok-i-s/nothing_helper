@@ -20,7 +20,10 @@ func (s *State) commandWorker() {
 		select {
 		case <-s.ctx.Done():
 			return
-		case cmd := <-s.cmdQueue:
+		case cmd, ok := <-s.cmdQueue:
+			if !ok {
+				return
+			}
 			result := actions.Execute(s.session, cmd, actions.ExecOpts{
 				Source: "gio",
 			})

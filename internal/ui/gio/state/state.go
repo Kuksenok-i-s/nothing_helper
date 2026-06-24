@@ -14,8 +14,8 @@ import (
 	"tws_manager/internal/connect"
 	"tws_manager/internal/session"
 	"tws_manager/internal/trace"
-	"tws_manager/internal/ui/gio/config"
 	"tws_manager/internal/ui/dualprompt"
+	"tws_manager/internal/ui/gio/config"
 	"tws_manager/internal/ui/presenter"
 )
 
@@ -52,29 +52,35 @@ const (
 	ActionAuto       Action = "auto"
 )
 
+type windowInvalidator interface {
+	Invalidate()
+}
+
 // State holds Gio application state and widget handles.
 type State struct {
-	ctx         context.Context
-	window      *app.Window
-	manager     *connect.Manager
-	session     *session.Session
-	presenter   *presenter.State
-	events      <-chan session.Event
+	ctx           context.Context
+	window        windowInvalidator
+	manager       *connect.Manager
+	session       *session.Session
+	presenter     *presenter.State
+	events        <-chan session.Event
 	allowUnsafe   bool
 	autoReconnect bool
 	captureDir    string
 	logRaw        bool
 
-	mu          sync.Mutex
-	devices     []bt.Device
-	selectedDev int
-	activeTab   Tab
-	commands    []presenter.Command
-	comment     string
-	devClicks   []widget.Clickable
-	dualClicks  []widget.Clickable
-	sudoPrompt  string
-	sudoReply   chan sudoPasswordResult
+	mu                sync.Mutex
+	devices           []bt.Device
+	selectedDev       int
+	activeTab         Tab
+	commands          []presenter.Command
+	comment           string
+	invalidatePending bool
+	windowChanged     chan struct{}
+	devClicks         []widget.Clickable
+	dualClicks        []widget.Clickable
+	sudoPrompt        string
+	sudoReply         chan sudoPasswordResult
 
 	dualPrompt dualprompt.Controller
 	cmdQueue   chan presenter.Command
@@ -113,18 +119,18 @@ type State struct {
 
 // Snapshot is an immutable view of State for rendering.
 type Snapshot struct {
-	Session    session.Snapshot
-	Status     string
-	ErrText    string
-	LogText    string
-	Devices    []bt.Device
-	Selected   int
-	Tab        Tab
-	Commands   []presenter.Command
-	Clicks     []widget.Clickable
-	Packets    int
-	Recent     []trace.Event
-	RawPackets []trace.Event
+	Session         session.Snapshot
+	Status          string
+	ErrText         string
+	LogText         string
+	Devices         []bt.Device
+	Selected        int
+	Tab             Tab
+	Commands        []presenter.Command
+	Clicks          []widget.Clickable
+	Packets         int
+	Recent          []trace.Event
+	RawPackets      []trace.Event
 	SudoPrompt      string
 	DualPrompt      string
 	DualPromptShown bool
@@ -149,11 +155,13 @@ func New(ctx context.Context, w *app.Window, opts config.Options, sess *session.
 		captureDir:    opts.CaptureDir,
 		logRaw:        opts.LogRaw,
 		activeTab:     TabControl,
-		dualPrompt: dualprompt.Controller{Mode: opts.PCPrimary},
-		cmdQueue:   make(chan presenter.Command, 32),
+		dualPrompt:    dualprompt.Controller{Mode: opts.PCPrimary},
+		cmdQueue:      make(chan presenter.Command, 32),
+		windowChanged: make(chan struct{}, 1),
 	}
 	go s.commandWorker()
 	go s.preloadHostMAC()
+	go s.pollDeviceStatus()
 	s.presenter.AutoReconnect = opts.AutoConnect
 	s.SudoPassword.SingleLine = true
 	s.SudoPassword.Submit = true
@@ -225,18 +233,18 @@ func (s *State) Snapshot() Snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return Snapshot{
-		Session:    s.session.Snapshot(),
-		Status:     s.presenter.Status,
-		ErrText:    s.presenter.Err,
-		LogText:    s.presenter.LogText(),
-		Devices:    append([]bt.Device(nil), s.devices...),
-		Selected:   s.selectedDev,
-		Tab:        s.activeTab,
-		Commands:   append([]presenter.Command(nil), s.commands...),
-		Clicks:     s.devClicks,
-		Packets:    len(s.presenter.LastEvents),
-		Recent:     recentEvents(s.presenter.LastEvents, 3),
-		RawPackets: chronologicalEvents(s.presenter.LastEvents, 16),
+		Session:         s.session.Snapshot(),
+		Status:          s.presenter.Status,
+		ErrText:         s.presenter.Err,
+		LogText:         s.presenter.LogText(),
+		Devices:         append([]bt.Device(nil), s.devices...),
+		Selected:        s.selectedDev,
+		Tab:             s.activeTab,
+		Commands:        append([]presenter.Command(nil), s.commands...),
+		Clicks:          s.devClicks,
+		Packets:         len(s.presenter.LastEvents),
+		Recent:          recentEvents(s.presenter.LastEvents, 3),
+		RawPackets:      chronologicalEvents(s.presenter.LastEvents, 16),
 		SudoPrompt:      s.sudoPrompt,
 		DualPromptShown: s.dualPrompt.Visible && s.dualPrompt.PendingOK,
 		DualPrompt:      s.dualPrompt.PromptLine(),
@@ -265,15 +273,23 @@ func recentEvents(events []trace.Event, n int) []trace.Event {
 }
 
 func (s *State) SetTab(tab Tab) {
+	s.mu.Lock()
+	changed := s.activeTab != tab
 	s.activeTab = tab
-	s.invalidate()
+	s.mu.Unlock()
+	if changed {
+		s.invalidate()
+	}
 }
 
 func (s *State) SelectDevice(index int) {
 	s.mu.Lock()
+	changed := s.selectedDev != index
 	s.selectedDev = index
 	s.mu.Unlock()
-	s.invalidate()
+	if changed {
+		s.invalidate()
+	}
 }
 
 // DeviceClick returns a stable clickable for device list row i.
@@ -347,9 +363,13 @@ func (s *State) MarkTogglePending(feature string, want bool) {
 // SetStatus updates the transient status line (used for UI feedback).
 func (s *State) SetStatus(msg string) {
 	s.mu.Lock()
+	changed := s.presenter.Status != msg || s.presenter.Err != ""
 	s.presenter.Status = msg
+	s.presenter.Err = ""
 	s.mu.Unlock()
-	s.invalidate()
+	if changed {
+		s.invalidate()
+	}
 }
 
 func (s *State) syncCmdButtons() {
@@ -361,13 +381,44 @@ func (s *State) syncCmdButtons() {
 // SetWindow rebinds the Gio window after hide-to-tray recreation.
 func (s *State) SetWindow(w *app.Window) {
 	s.mu.Lock()
+	wasActive := s.window != nil
 	s.window = w
+	s.invalidatePending = false
+	isActive := s.window != nil
 	s.mu.Unlock()
+	if wasActive != isActive {
+		s.notifyWindowChanged()
+	}
 	s.invalidate()
 }
 
+// BeginFrame marks the queued redraw as consumed. New state changes during the
+// frame may request one more frame, but repeated invalidations before a frame
+// are collapsed into a single window wakeup.
+func (s *State) BeginFrame() {
+	s.mu.Lock()
+	s.invalidatePending = false
+	s.mu.Unlock()
+}
+
 func (s *State) invalidate() {
-	if s.window != nil {
-		s.window.Invalidate()
+	s.mu.Lock()
+	w := s.window
+	if w == nil || s.invalidatePending {
+		s.mu.Unlock()
+		return
+	}
+	s.invalidatePending = true
+	s.mu.Unlock()
+	w.Invalidate()
+}
+
+func (s *State) notifyWindowChanged() {
+	if s.windowChanged == nil {
+		return
+	}
+	select {
+	case s.windowChanged <- struct{}{}:
+	default:
 	}
 }

@@ -29,7 +29,7 @@ func (s *State) PumpEvents(ctx context.Context) {
 			if event.Kind == session.EventDisconnected {
 				s.resetOnDisconnectLocked()
 				s.clearDualPromptLocked()
-			} else {
+			} else if eventUpdatesCommands(event) {
 				s.commands = presenter.BuildCommands(snap.Model, snap.DualList, s.allowUnsafe)
 				s.syncCmdButtons()
 				s.evaluateDualPrompt(snap)
@@ -37,6 +37,15 @@ func (s *State) PumpEvents(ctx context.Context) {
 			s.mu.Unlock()
 			s.invalidate()
 		}
+	}
+}
+
+func eventUpdatesCommands(event session.Event) bool {
+	switch event.Kind {
+	case session.EventConnected, session.EventModel:
+		return true
+	default:
+		return event.Parsed.DualList != nil
 	}
 }
 
@@ -70,7 +79,7 @@ func (s *State) RunDualAction(dev spp.DualDevice) {
 	if name == "" {
 		name = dev.MAC
 	}
-	go s.RunCommand(presenter.Command{
+	s.RunCommand(presenter.Command{
 		Title:  fmt.Sprintf("Dual: %s %s", action, name),
 		Fields: []string{"dual", action, dev.MAC},
 	})
@@ -78,7 +87,7 @@ func (s *State) RunDualAction(dev spp.DualDevice) {
 
 // RefreshDualList requests the paired dual-connection device list.
 func (s *State) RefreshDualList() {
-	go s.RunCommand(presenter.Command{
+	s.RunCommand(presenter.Command{
 		Title:  "Dual: list",
 		Fields: []string{"dual", "list"},
 	})
@@ -86,11 +95,19 @@ func (s *State) RefreshDualList() {
 
 func (s *State) setErr(msg string) {
 	s.mu.Lock()
+	changed := s.presenter.Err != msg
 	s.presenter.Err = msg
 	s.mu.Unlock()
+	if changed {
+		s.invalidate()
+	}
 }
 
-func (s *State) SyncCommands() { s.syncCmdButtons() }
+func (s *State) SyncCommands() {
+	s.mu.Lock()
+	s.syncCmdButtons()
+	s.mu.Unlock()
+}
 
 // refreshFeatureAfterSet re-reads a feature after a SET so the status panel updates.
 func (s *State) refreshFeatureAfterSet(fields []string) {

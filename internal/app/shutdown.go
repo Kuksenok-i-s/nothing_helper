@@ -60,6 +60,8 @@ func Run(ctx context.Context, cfg Config, fn func(context.Context, *Runtime) err
 		shutdown()
 	}()
 
+	go StartPprof(ctx, cfg.PprofAddr)
+
 	if err := fn(ctx, rt); err != nil {
 		return err
 	}

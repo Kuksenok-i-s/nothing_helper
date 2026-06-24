@@ -39,20 +39,21 @@ type darwinTransport struct {
 }
 
 func (t *darwinTransport) Read(p []byte) (int, error) {
-	if t.closed.Load() {
-		return 0, io.EOF
-	}
 	if len(p) == 0 {
 		return 0, nil
 	}
-	n := int(C.bt_transport_read(C.int(t.handle), (*C.uint8_t)(unsafe.Pointer(&p[0])), C.int(len(p)), 500))
-	if n < 0 {
-		return 0, fmt.Errorf("darwin rfcomm read: %d", n)
+	for {
+		if t.closed.Load() {
+			return 0, io.EOF
+		}
+		n := int(C.bt_transport_read(C.int(t.handle), (*C.uint8_t)(unsafe.Pointer(&p[0])), C.int(len(p)), 1000))
+		if n < 0 {
+			return 0, fmt.Errorf("darwin rfcomm read: %d", n)
+		}
+		if n > 0 {
+			return n, nil
+		}
 	}
-	if n == 0 {
-		return 0, nil
-	}
-	return n, nil
 }
 
 func (t *darwinTransport) Write(p []byte) (int, error) {

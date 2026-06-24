@@ -215,7 +215,7 @@ func commandListBody(gtx layout.Context, th *material.Theme, s *state.State, sna
 		return layout.Inset{Bottom: theme.GapSM, Right: theme.GapSM}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			dims, clicked := widgets.Button(gtx, th, &s.CmdButtons[idx], cmd.Title, variant)
 			if clicked {
-				go s.RunCommand(cmd)
+				s.RunCommand(cmd)
 			}
 			return dims
 		})

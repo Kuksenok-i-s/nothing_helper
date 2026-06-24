@@ -21,4 +21,5 @@ type Config struct {
 	AutoDiscover        bool
 	Notify              bool
 	PCPrimary           string
+	PprofAddr           string
 }

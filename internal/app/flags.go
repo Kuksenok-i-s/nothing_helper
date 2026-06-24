@@ -30,6 +30,7 @@ type FlagValues struct {
 	PrivilegeHelper     string
 	PrivilegeHelperPath string
 	PCPrimary           string
+	PprofAddr           string
 }
 
 // RegisterFlags defines shared flags and applies profile-specific defaults.
@@ -51,6 +52,7 @@ func RegisterFlags(fs *flag.FlagSet, profile Profile) *FlagValues {
 	fs.BoolVar(&v.Notify, "notify", notifyDefault, "show desktop notifications for battery/connection events")
 	fs.StringVar(&v.PrivilegeHelperPath, "privilege-helper-path", "", "optional absolute path to polkit helper binary")
 	fs.StringVar(&v.PCPrimary, "pc-primary", "ask", "dual PC-primary policy: ask|off")
+	fs.StringVar(&v.PprofAddr, "pprof-addr", "", "serve Go pprof on this address, e.g. 127.0.0.1:6060 (disabled when empty)")
 	return v
 }
 
@@ -70,5 +72,6 @@ func ConfigFromFlags(v *FlagValues) (Config, error) {
 	cfg.PrivilegeMode = v.PrivilegeHelper
 	cfg.PrivilegeHelperPath = v.PrivilegeHelperPath
 	cfg.PCPrimary = v.PCPrimary
+	cfg.PprofAddr = v.PprofAddr
 	return cfg, nil
 }

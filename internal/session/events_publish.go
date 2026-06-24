@@ -1,10 +1,6 @@
 package session
 
-import (
-	"time"
-
-	"tws_manager/internal/trace"
-)
+import "tws_manager/internal/trace"
 
 func (s *Session) publish(event Event) {
 	if s.logger != nil && event.Trace.Direction == "" {
@@ -28,17 +24,29 @@ func (s *Session) publish(event Event) {
 	s.mu.Unlock()
 	for _, ch := range subscribers {
 		if isPriorityEvent(event.Kind) {
-			select {
-			case ch <- event:
-			case <-time.After(2 * time.Second):
-				// Subscriber slow; drop after brief wait rather than block forever.
-			}
+			publishPriority(ch, event)
 			continue
 		}
 		select {
 		case ch <- event:
 		default:
 		}
+	}
+}
+
+func publishPriority(ch chan Event, event Event) {
+	select {
+	case ch <- event:
+		return
+	default:
+	}
+	select {
+	case <-ch:
+	default:
+	}
+	select {
+	case ch <- event:
+	default:
 	}
 }
 

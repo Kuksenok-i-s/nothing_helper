@@ -5,10 +5,18 @@ import path from "node:path";
 
 const projectPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+const socraticodeEnv = {
+  ...process.env,
+  EMBEDDING_PROVIDER: "ollama",
+  OLLAMA_MODE: "external",
+  OLLAMA_URL: "http://localhost:11434",
+  EMBEDDING_MODEL: "nomic-embed-text",
+};
+
 const transport = new StdioClientTransport({
   command: "npx",
   args: ["-y", "socraticode"],
-  env: { ...process.env },
+  env: socraticodeEnv,
   cwd: projectPath,
 });
 

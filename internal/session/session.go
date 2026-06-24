@@ -74,24 +74,25 @@ type pendingTX struct {
 }
 
 type Session struct {
-	mu           sync.Mutex
-	connectMu    sync.Mutex
-	transport    bt.Transport
-	device       bt.Device
-	model        spp.ModelInfo
-	batteries    map[string]spp.Battery
-	logger       *trace.Logger
-	events       chan Event
-	subscribers  []chan Event
-	lastTX       *trace.Event
-	pending      map[byte]pendingTX
-	dualList     []spp.DualDevice
-	config       map[string]string
-	captureDir   string
-	rawCapture   *os.File
-	allowUnsafe  bool
-	probeEnabled bool
-	manualModel  bool
+	mu             sync.Mutex
+	connectMu      sync.Mutex
+	transport      bt.Transport
+	device         bt.Device
+	model          spp.ModelInfo
+	batteries      map[string]spp.Battery
+	logger         *trace.Logger
+	events         chan Event
+	subscribers    []chan Event
+	lastTX         *trace.Event
+	pending        map[byte]pendingTX
+	dualList       []spp.DualDevice
+	config         map[string]string
+	captureDir     string
+	rawCapture     *os.File
+	allowUnsafe    bool
+	probeEnabled   bool
+	manualModel    bool
+	batteryPolling bool
 }
 
 func New(logger *trace.Logger, allowUnsafe, probeEnabled bool) *Session {
@@ -530,7 +531,19 @@ func (s *Session) StartBatteryPolling(ctx context.Context, every time.Duration) 
 	if every < 30*time.Second {
 		every = 30 * time.Second
 	}
+	s.mu.Lock()
+	if s.batteryPolling {
+		s.mu.Unlock()
+		return
+	}
+	s.batteryPolling = true
+	s.mu.Unlock()
 	go func() {
+		defer func() {
+			s.mu.Lock()
+			s.batteryPolling = false
+			s.mu.Unlock()
+		}()
 		ticker := time.NewTicker(every)
 		defer ticker.Stop()
 		for {
@@ -538,10 +551,17 @@ func (s *Session) StartBatteryPolling(ctx context.Context, every time.Duration) 
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				if !shouldSendBatteryPoll(s.Snapshot()) {
+					continue
+				}
 				_ = s.SendCommand(spp.CmdGetBattery, Meta{Source: "auto_poll", Trigger: "battery refresh"})
 			}
 		}
 	}()
+}
+
+func shouldSendBatteryPoll(snap Snapshot) bool {
+	return snap.Connected
 }
 
 // openRawCaptureLocked opens a per-connection raw stream file. Caller holds s.mu.
@@ -669,4 +689,3 @@ func (s *Session) handleRaw(raw []byte) {
 func (s *Session) traceContext(meta Meta, dev bt.Device, model spp.ModelInfo, related string) trace.Context {
 	return trace.Context{Source: meta.Source, Trigger: meta.Trigger, Device: trace.DeviceInfo{MAC: dev.MAC, Name: dev.Name}, Model: model, UserComment: meta.UserComment, RelatedTXCommand: related}
 }
-

@@ -1,4 +1,4 @@
-.PHONY: help install-deps install-deps-debian run run-systray run-gio run-gio-lite run-gio-systray build build-systray build-gio build-gio-lite build-gio-systray build-helper build-gio-package package-deb package-arch package-rpm package-macos install-local vet test test-race check fmt lint clean
+.PHONY: help install-deps install-deps-debian run run-systray run-gio run-gio-lite run-gio-systray build build-systray build-gio build-gio-lite build-gio-systray build-helper build-gio-package package-deb package-arch package-rpm package-macos install-local vet test test-race check fmt lint clean profile-gio profile-gio-web sample-macos-app
 
 BINARY ?= tws_manager
 BINARY_GIO ?= tws_manager_gio
@@ -33,6 +33,9 @@ help:
 	@echo "  make fmt                 Format Go code"
 	@echo "  make lint                Alias for make vet"
 	@echo "  make clean               Remove build outputs"
+	@echo "  make profile-gio         Build Gio, capture CPU pprof (captures/profiles/)"
+	@echo "  make profile-gio-web     Open last CPU profile in browser (go tool pprof -http)"
+	@echo "  make sample-macos-app    macOS sample(1) of running tws_manager (no rebuild)"
 	@echo ""
 	@echo "Use ARGS='...' to pass flags, for example:"
 	@echo "  make run ARGS='--device /dev/rfcomm0'"
@@ -145,3 +148,19 @@ lint: vet
 
 clean:
 	rm -rf bin
+
+PROFILE_SECONDS ?= 20
+PROFILE_ADDR ?= 127.0.0.1:6060
+
+profile-gio:
+	chmod +x scripts/profile-gio.sh
+	PROFILE_SECONDS=$(PROFILE_SECONDS) PROFILE_ADDR=$(PROFILE_ADDR) ./scripts/profile-gio.sh $(ARGS)
+
+profile-gio-web:
+	@prof=$$(ls -t captures/profiles/cpu-*.prof 2>/dev/null | head -1); \
+	if [ -z "$$prof" ]; then echo "No profile in captures/profiles/; run make profile-gio first"; exit 1; fi; \
+	go tool pprof -http=:8080 "$$prof"
+
+sample-macos-app:
+	chmod +x scripts/sample-macos-app.sh
+	./scripts/sample-macos-app.sh tws_manager $(PROFILE_SECONDS)
