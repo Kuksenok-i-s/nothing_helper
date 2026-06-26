@@ -365,6 +365,9 @@ func TestSendRemovesPendingOnWriteError(t *testing.T) {
 	if pendingLen != 0 {
 		t.Fatalf("pending map len = %d, want 0 after write failure", pendingLen)
 	}
+	if s.Snapshot().Connected {
+		t.Fatal("expected disconnect after write failure")
+	}
 }
 
 func TestConnectClearsLiveStateOnDeviceSwitch(t *testing.T) {

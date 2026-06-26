@@ -64,6 +64,16 @@ func (t *darwinTransport) Write(p []byte) (int, error) {
 		return 0, nil
 	}
 	n := int(C.bt_transport_write(C.int(t.handle), (*C.uint8_t)(unsafe.Pointer(&p[0])), C.int(len(p))))
+	switch n {
+	case -4:
+		return 0, fmt.Errorf("darwin rfcomm write: timed out after 5s")
+	case -3:
+		return 0, fmt.Errorf("darwin rfcomm write: IOBluetooth writeSync failed (channel may be closed)")
+	case -2:
+		return 0, fmt.Errorf("darwin rfcomm write: channel not found")
+	case -1:
+		return 0, fmt.Errorf("darwin rfcomm write: invalid argument")
+	}
 	if n < 0 {
 		return 0, fmt.Errorf("darwin rfcomm write: %d", n)
 	}

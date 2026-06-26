@@ -76,6 +76,7 @@ type pendingTX struct {
 type Session struct {
 	mu             sync.Mutex
 	connectMu      sync.Mutex
+	txMu           sync.Mutex // serializes transport writes (IOBluetooth writeSync is not re-entrant)
 	transport      bt.Transport
 	device         bt.Device
 	model          spp.ModelInfo
@@ -497,13 +498,30 @@ func (s *Session) Send(pkt spp.Packet, meta Meta) error {
 	}
 	dev := s.device
 	model := s.model
-	s.pending[pkt.FSN] = pendingTX{command: fmt.Sprintf("%04x", pkt.Cmd), trigger: meta.Trigger}
+	fsn := pkt.FSN
+	s.pending[fsn] = pendingTX{command: fmt.Sprintf("%04x", pkt.Cmd), trigger: meta.Trigger}
+	s.mu.Unlock()
+
+	s.txMu.Lock()
 	_, err := transport.Write(raw)
+	s.txMu.Unlock()
+
 	if err != nil {
-		delete(s.pending, pkt.FSN)
+		s.mu.Lock()
+		delete(s.pending, fsn)
 		s.mu.Unlock()
 		s.publish(Event{Kind: EventError, Device: dev, Error: err, Source: meta.Source, Trigger: meta.Trigger})
+		if s.isCurrentTransport(transport) {
+			_, _ = s.finalizeDisconnect(transport, meta.Source, "write error", err)
+		}
 		return err
+	}
+
+	s.mu.Lock()
+	if s.transport != transport {
+		delete(s.pending, fsn)
+		s.mu.Unlock()
+		return fmt.Errorf("not connected")
 	}
 	ctx := s.traceContext(meta, dev, model, "")
 	tr := trace.Event{}

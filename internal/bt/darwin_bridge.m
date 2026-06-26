@@ -12,6 +12,7 @@ static const int kOpenMaxAttempts = 3;
 // CFRunLoopRunInMode from Go reader threads: sample(1) showed heavy CPU in
 // __CFRunLoopCopyMode when that was used for idle polling.
 static const NSTimeInterval kReadWaitSliceSec = 1.0;
+static const NSTimeInterval kWriteTimeoutSec = 5.0;
 
 @interface BTRFCOMMDelegate : NSObject <IOBluetoothRFCOMMChannelDelegate>
 @property (nonatomic, assign) int handle;
@@ -515,7 +516,17 @@ int bt_transport_write(int handle, const uint8_t *data, int len) {
     if (!ch) {
         return -2;
     }
-    IOReturn status = [ch writeSync:(void *)data length:(UInt16)len];
+    __block IOReturn status = kIOReturnError;
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    IOBluetoothRFCOMMChannel *channel = ch;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        status = [channel writeSync:(void *)data length:(UInt16)len];
+        dispatch_semaphore_signal(sem);
+    });
+    dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kWriteTimeoutSec * NSEC_PER_SEC));
+    if (dispatch_semaphore_wait(sem, deadline) != 0) {
+        return -4;
+    }
     if (status != kIOReturnSuccess) {
         return -3;
     }
