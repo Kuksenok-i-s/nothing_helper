@@ -57,6 +57,7 @@ Response match: FSN echo, else `0x40xx` → request `0xC0xx`.
 |-----|---------|
 | `DiscoverDevices` | List candidates |
 | `BindRFCOMMDevice` / `ReleaseRFCOMMDevice` | rfcomm bind/release |
+| `BindRFCOMMWithProbe` | Linux bind with channel probe (used by `connect.Manager.Bind`) |
 | `ReviveRFCOMMDevice` | release → bind → chmod → verify open |
 | `OpenRFCOMMDevice` | Used by `session.Connect` |
 | `ConfigurePrivileges` | sudo / polkit / auto / none |

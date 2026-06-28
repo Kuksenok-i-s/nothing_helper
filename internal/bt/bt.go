@@ -206,6 +206,35 @@ func BindRFCOMMDevice(device, address string, channel int) error {
 	return nil
 }
 
+// BindRFCOMMWithProbe binds an RFCOMM TTY, probing alternate channels when the
+// preferred one fails. Returns the channel that worked.
+func BindRFCOMMWithProbe(device, address string, channel int, progress RFCOMMProgress) (int, error) {
+	device, address, channel, err := validateRFCCOMMBind(device, address, channel)
+	if err != nil {
+		return 0, err
+	}
+	channel = ResolveDeviceChannel(address, channel)
+	usedChannel, err := probeRFCOMMChannels(channel, progress, "binding", func(ch, attempt int) error {
+		if attempt > 0 {
+			_ = ReleaseRFCOMMDevice(device)
+		}
+		if err := BindRFCOMMDevice(device, address, ch); err != nil {
+			return err
+		}
+		f, err := openFileWithTimeout(device, 2*time.Second)
+		if err != nil {
+			return err
+		}
+		_ = f.Close()
+		_ = RememberDeviceChannel(address, ch)
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return usedChannel, nil
+}
+
 // ReleaseRFCOMMDevice unbinds an RFCOMM TTY. "Not bound" is treated as success.
 func ReleaseRFCOMMDevice(device string) error {
 	device, err := security.ValidateRFCOMMDevice(device)

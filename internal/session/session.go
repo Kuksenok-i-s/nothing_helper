@@ -218,28 +218,11 @@ func (s *Session) autoDetectModelFromPacketLocked(device bt.Device, pkt spp.Pack
 }
 
 func (s *Session) Connect(device bt.Device, transportRef string, channel int) error {
-	if transportRef != "" {
-		if _, err := security.ValidateTransportRef(transportRef); err != nil {
-			return err
-		}
-	}
-	if err := security.ValidateChannel(channel); err != nil {
-		return err
-	}
 	if device.MAC != "" {
 		if mac, err := security.NormalizeMAC(device.MAC); err != nil {
 			return err
 		} else {
 			device.MAC = mac
-		}
-	}
-
-	if device.MAC == "" {
-		if mac, ok := bt.LookupDeviceMAC(transportRef); ok {
-			device.MAC = mac
-			if device.Name == "" || device.Name == transportRef {
-				device.Name = mac
-			}
 		}
 	}
 
@@ -260,6 +243,24 @@ func (s *Session) Connect(device bt.Device, transportRef string, channel int) er
 		}
 		s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: fmt.Sprintf("already connected to %s", name)})
 		return nil
+	}
+
+	if transportRef != "" {
+		if _, err := security.ValidateTransportRef(transportRef); err != nil {
+			return err
+		}
+	}
+	if err := security.ValidateChannel(channel); err != nil {
+		return err
+	}
+
+	if device.MAC == "" {
+		if mac, ok := bt.LookupDeviceMAC(transportRef); ok {
+			device.MAC = mac
+			if device.Name == "" || device.Name == transportRef {
+				device.Name = mac
+			}
+		}
 	}
 
 	if device.MAC != "" && (device.Info == "" || device.Name == "" || strings.EqualFold(device.Name, device.MAC)) {
