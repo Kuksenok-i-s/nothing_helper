@@ -1,0 +1,113 @@
+name: Release macOS client
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version label for artifacts (e.g. 1.2.0); tag releases ignore this'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: vet / build / test
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ./...
+
+  release-macos-client:
+    name: macOS universal DMG
+    needs: test
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      artifact: ${{ steps.pkg.outputs.artifact }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: ver
+        env:
+          APP_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          version="$(./scripts/pkg-version.sh)"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "Release version: ${version}"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build macOS installer
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: make package-macos
+
+      - name: Package release artifacts
+        id: pkg
+        shell: bash
+        run: |
+          version="${{ steps.ver.outputs.version }}"
+          artifact="dist/tws_manager-${version}-universal.dmg"
+          if [[ ! -f "${artifact}" ]]; then
+            echo "error: expected DMG not found: ${artifact}" >&2
+            ls -la dist/ >&2 || true
+            exit 1
+          fi
+          shasum -a 256 "${artifact}" > "${artifact}.sha256"
+          echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tws-manager-macos-${{ steps.ver.outputs.version }}
+          path: |
+            ${{ steps.pkg.outputs.artifact }}
+            ${{ steps.pkg.outputs.artifact }}.sha256
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: release-macos-client
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS DMG
+        uses: actions/download-artifact@v4
+        with:
+          name: tws-manager-macos-${{ needs.release-macos-client.outputs.version }}
+          path: dist/macos
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: tws_manager v${{ needs.release-macos-client.outputs.version }}
+          files: dist/macos/*
+          append_body: true
+          generate_release_notes: true

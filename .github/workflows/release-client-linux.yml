@@ -1,0 +1,336 @@
+name: Release Linux client
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Optional version override (default: git tag v* or 0.0.0~dev.<sha>)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: vet / build / test -race
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test (race)
+        run: go test -race ./...
+
+  release-linux-deb-amd64:
+    name: Debian amd64
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: ver
+        env:
+          APP_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          version="$(./scripts/pkg-version.sh)"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "Release version: ${version}"
+
+      - name: Set package version
+        env:
+          PKG_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          version="${PKG_VERSION}"
+          {
+            echo "tws_manager (${version}-1) unstable; urgency=medium"
+            echo
+            echo "  * Release ${version}."
+            echo
+            echo " -- tws_manager maintainers <kuksyenok.i.s@gmail.com>  $(date -R)"
+          } > packaging/debian/changelog
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev debhelper golang-go pkg-config libayatana-appindicator3-dev libgtk-3-dev libvulkan-dev
+
+      - name: Build Debian package
+        env:
+          ARCH: amd64
+        run: make package-deb
+
+      - name: Package release artifacts
+        id: pkg
+        run: |
+          version="${{ steps.ver.outputs.version }}"
+          artifact="dist/tws_manager_${version}-1_amd64.deb"
+          if [[ ! -f "${artifact}" ]]; then
+            echo "error: expected .deb not found: ${artifact}" >&2
+            ls -la dist/ >&2 || true
+            exit 1
+          fi
+          sha256sum "${artifact}" > "${artifact}.sha256"
+          echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tws-manager-linux-deb-amd64-${{ steps.ver.outputs.version }}
+          path: |
+            ${{ steps.pkg.outputs.artifact }}
+            ${{ steps.pkg.outputs.artifact }}.sha256
+          if-no-files-found: error
+
+  release-linux-deb-arm64:
+    name: Debian arm64
+    needs: test
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: ver
+        env:
+          APP_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          version="$(./scripts/pkg-version.sh)"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set package version
+        env:
+          PKG_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          version="${PKG_VERSION}"
+          {
+            echo "tws_manager (${version}-1) unstable; urgency=medium"
+            echo
+            echo "  * Release ${version}."
+            echo
+            echo " -- tws_manager maintainers <kuksyenok.i.s@gmail.com>  $(date -R)"
+          } > packaging/debian/changelog
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev debhelper golang-go pkg-config libayatana-appindicator3-dev libgtk-3-dev libvulkan-dev
+
+      - name: Build Debian package
+        env:
+          ARCH: arm64
+        run: make package-deb
+
+      - name: Package release artifacts
+        id: pkg
+        run: |
+          version="${{ steps.ver.outputs.version }}"
+          artifact="dist/tws_manager_${version}-1_arm64.deb"
+          if [[ ! -f "${artifact}" ]]; then
+            echo "error: expected .deb not found: ${artifact}" >&2
+            ls -la dist/ >&2 || true
+            exit 1
+          fi
+          sha256sum "${artifact}" > "${artifact}.sha256"
+          echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tws-manager-linux-deb-arm64-${{ steps.ver.outputs.version }}
+          path: |
+            ${{ steps.pkg.outputs.artifact }}
+            ${{ steps.pkg.outputs.artifact }}.sha256
+          if-no-files-found: error
+
+  release-linux-arch-amd64:
+    name: Arch amd64
+    needs: test
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      options: --privileged
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: ver
+        env:
+          APP_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          version="$(./scripts/pkg-version.sh)"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set package version
+        env:
+          PKG_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          version="${PKG_VERSION//\~/.}"
+          sed -i "s/^pkgver=.*/pkgver=${version}/" packaging/arch/PKGBUILD
+
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm base-devel go curl unzip fakeroot binutils zstd git pkgconf gtk3 vulkan-headers libayatana-appindicator
+
+      - name: Build Arch package
+        env:
+          ARCH: amd64
+        run: make package-arch
+
+      - name: Package release artifacts
+        id: pkg
+        run: |
+          version="${{ steps.ver.outputs.version }}"
+          pacman_ver="${version//\~/.}"
+          artifact="dist/tws_manager-${pacman_ver}-1-x86_64.pkg.tar.zst"
+          if [[ ! -f "${artifact}" ]]; then
+            echo "error: expected Arch package not found: ${artifact}" >&2
+            ls -la dist/ packaging/arch/ >&2 || true
+            exit 1
+          fi
+          sha256sum "${artifact}" > "${artifact}.sha256"
+          echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tws-manager-linux-arch-amd64-${{ steps.ver.outputs.version }}
+          path: |
+            ${{ steps.pkg.outputs.artifact }}
+            ${{ steps.pkg.outputs.artifact }}.sha256
+          if-no-files-found: error
+
+  release-linux-bundle-amd64:
+    name: Portable tarball amd64
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: ver
+        env:
+          APP_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          version="$(./scripts/pkg-version.sh)"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libayatana-appindicator3-dev libgtk-3-dev libvulkan-dev
+
+      - name: Build portable bundle
+        env:
+          ARCH: amd64
+          PKG_VERSION: ${{ steps.ver.outputs.version }}
+        run: make client-bundle-linux
+
+      - name: Package release artifacts
+        id: pkg
+        run: |
+          version="${{ steps.ver.outputs.version }}"
+          artifact="dist/tws_manager-${version}-linux-amd64.tar.gz"
+          if [[ ! -f "${artifact}" ]]; then
+            echo "error: expected tarball not found: ${artifact}" >&2
+            ls -la dist/ >&2 || true
+            exit 1
+          fi
+          sha256sum "${artifact}" > "${artifact}.sha256"
+          echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tws-manager-linux-bundle-amd64-${{ steps.ver.outputs.version }}
+          path: |
+            ${{ steps.pkg.outputs.artifact }}
+            ${{ steps.pkg.outputs.artifact }}.sha256
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    needs:
+      - release-linux-deb-amd64
+      - release-linux-deb-arm64
+      - release-linux-arch-amd64
+      - release-linux-bundle-amd64
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Debian amd64
+        uses: actions/download-artifact@v4
+        with:
+          name: tws-manager-linux-deb-amd64-${{ needs.release-linux-deb-amd64.outputs.version }}
+          path: dist/deb-amd64
+
+      - name: Download Debian arm64
+        uses: actions/download-artifact@v4
+        with:
+          name: tws-manager-linux-deb-arm64-${{ needs.release-linux-deb-arm64.outputs.version }}
+          path: dist/deb-arm64
+
+      - name: Download Arch amd64
+        uses: actions/download-artifact@v4
+        with:
+          name: tws-manager-linux-arch-amd64-${{ needs.release-linux-arch-amd64.outputs.version }}
+          path: dist/arch-amd64
+
+      - name: Download portable tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: tws-manager-linux-bundle-amd64-${{ needs.release-linux-bundle-amd64.outputs.version }}
+          path: dist/bundle
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: tws_manager v${{ needs.release-linux-deb-amd64.outputs.version }}
+          files: |
+            dist/deb-amd64/*
+            dist/deb-arm64/*
+            dist/arch-amd64/*
+            dist/bundle/*
+          append_body: true
+          generate_release_notes: true

@@ -1,4 +1,4 @@
-.PHONY: help install-deps install-deps-debian run run-systray run-gio run-gio-lite run-gio-systray build build-systray build-gio build-gio-lite build-gio-systray build-helper build-gio-package package-deb package-arch package-rpm package-macos install-local vet test test-race check fmt lint clean profile-gio profile-gio-web sample-macos-app
+.PHONY: help install-deps install-deps-debian run run-systray run-gio run-gio-lite run-gio-systray build build-systray build-gio build-gio-lite build-gio-systray build-helper build-gio-package prepare-debian package-deb package-arch package-rpm package-macos client-bundle-linux install-local vet test test-race check fmt lint clean profile-gio profile-gio-web sample-macos-app
 
 BINARY ?= tws_manager
 BINARY_GIO ?= tws_manager_gio
@@ -25,6 +25,7 @@ help:
 	@echo "  make package-arch        Prepare Arch package (PKGBUILD)"
 	@echo "  make package-rpm         Build Fedora RPM (rpmbuild)"
 	@echo "  make package-macos       Build universal macOS .app + DMG (requires macOS + Xcode CLT)"
+	@echo "  make client-bundle-linux Build portable Linux tarball (binaries only)"
 	@echo "  make install-local       Install assets under /usr/local (needs sudo)"
 	@echo "  make vet                 Run go vet ./..."
 	@echo "  make test                Run go test ./..."
@@ -105,11 +106,25 @@ build-helper:
 
 build-gio-package: build-gio build-helper build
 
-package-deb: build-gio-package
+prepare-debian:
+	ln -sfn "$(CURDIR)/packaging/debian" "$(CURDIR)/debian"
+
+package-deb: build-gio-package prepare-debian
 	dpkg-buildpackage -us -uc -b -d
+	@mkdir -p dist
+	@cp ../tws_manager_*.deb dist/ 2>/dev/null || true
+
+client-bundle-linux: build-gio-package
+	@mkdir -p dist
+	@version="$${PKG_VERSION:-$$(./scripts/pkg-version.sh 2>/dev/null || echo 0.1.0)}"; \
+	arch="$${ARCH:-amd64}"; \
+	tar -czf "dist/tws_manager-$${version}-linux-$${arch}.tar.gz" \
+		-C bin tws_manager tws_manager_gio tws_manager_rfcomm_helper
 
 package-arch:
 	cd packaging/arch && makepkg -sf --noconfirm
+	@mkdir -p dist
+	@cp packaging/arch/tws_manager-*.pkg.tar.zst dist/ 2>/dev/null || true
 
 package-rpm: build-gio-package
 	rpmbuild -ba packaging/fedora/tws_manager.spec
