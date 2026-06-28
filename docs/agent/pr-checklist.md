@@ -6,6 +6,7 @@ Before finishing a task or opening a PR:
 - [ ] [invariants.md](invariants.md) respected — safety not weakened
 - [ ] Tests added/updated next to changed behaviour
 - [ ] `go test ./...` passes (or targeted packages documented)
+- [ ] CI will pass: Linux + macOS build/test; packaging changes need matching workflow review
 - [ ] New parser: fixture test with real/captured bytes + meaningful `Summary` string
 - [ ] UI change: updated `presenter` / `actions`; considered TUI + Gio impact
 - [ ] No raw bytes in default logs

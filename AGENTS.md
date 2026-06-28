@@ -150,6 +150,10 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
   - `go test ./internal/bt -run Test`
   - `go test ./internal/trace -run Test`
 
+CI (`.github/workflows/ci.yml`): Linux vet/build/test-race + Debian `.deb` smoke; macOS vet/build/test.
+
+Релизы: tag `v*` или `workflow_dispatch` в `release-client-linux.yml` / `release-client-macos.yml`. Версия: `scripts/pkg-version.sh`.
+
 Ручной запуск:
 - `go run ./cmd/tws_manager --device /dev/rfcomm0`
 - Gio: `make run-gio` или `go run -tags gio ./cmd/tws_manager_gio` (Linux: `vulkan-headers`)
@@ -160,13 +164,14 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
 
 ## 7) Быстрый чеклист для агентов перед PR
 
-1. Изменения ограничены Go-частью (`cmd` + `internal`).
+1. Изменения ограничены Go-частью (`cmd` + `internal`), если пользователь не просил packaging/docs/CI.
 2. Не ослаблены safety guardrails (`--unsafe`, scan limits).
 3. Добавлены/обновлены тесты рядом с измененным поведением.
 4. `go test ./...` проходит.
 5. Для новых parser/feature:
    - есть минимум один fixture/юнит-тест;
    - корректный summary в trace/TUI логах.
+6. Изменения packaging/Makefile/`.github/workflows`: проверить соответствующий CI job или release workflow.
 
 ## 8) Полезные ориентиры по коду
 

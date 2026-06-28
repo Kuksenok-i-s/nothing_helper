@@ -181,6 +181,7 @@ Packaging artifacts live under `packaging/`:
 - `packaging/debian` - Debian control/rules/install scripts
 - `packaging/arch/PKGBUILD` - Arch/Manjaro package recipe
 - `packaging/fedora/tws_manager.spec` - Fedora RPM spec
+- `packaging/macos` - universal `.app` + DMG (macOS only)
 - `packaging/common` - shared desktop/polkit/sysusers files
 
 Helper targets:
@@ -188,9 +189,19 @@ Helper targets:
 ```bash
 make build-helper
 make build-gio-package
-make package-deb
-make package-arch
+make package-deb              # .deb -> dist/tws_manager_<version>-1_<arch>.deb
+make package-arch             # Arch pkg -> dist/
 make package-rpm
+make package-macos            # macOS: dist/tws_manager-<version>-universal.dmg
+make client-bundle-linux      # portable tarball -> dist/tws_manager-<version>-linux-amd64.tar.gz
+```
+
+Release version for local packaging (optional):
+
+```bash
+./scripts/pkg-version.sh      # tag / APP_VERSION / 0.0.0~dev.<sha>
+VERSION=0.2.0 make package-macos
+PKG_VERSION=0.2.0 make client-bundle-linux
 ```
 
 ### Post-install (rootless)
@@ -233,8 +244,27 @@ gofmt -w cmd internal && make test         # format + tests
 
 After changes under `cmd/` or `internal/`, run the full test suite before committing.
 
+## CI / releases
+
+GitHub Actions workflows under `.github/workflows/`:
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `ci.yml` | push, pull_request | Linux vet/build/test-race; macOS vet/build/test; Debian `.deb` smoke build (amd64) |
+| `release-client-linux.yml` | tag `v*`, manual | `.deb` (amd64/arm64), Arch pkg (x86_64), portable tarball; publishes to GitHub Releases |
+| `release-client-macos.yml` | tag `v*`, manual | Universal macOS DMG; publishes to GitHub Releases |
+
+Cut a release:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+Both release workflows attach artifacts to the same GitHub Release (`tws_manager v<version>`). Manual runs: **Actions → Release Linux client / Release macOS client → Run workflow** (optional version override).
+
 ## Limitations
 
-- **Linux only** (depends on BlueZ and `/dev/rfcommN`).
+- **Linux** is the primary platform (BlueZ, `/dev/rfcommN`, polkit helper).
+- **macOS** is experimental (IOBluetooth RFCOMM, Gio GUI); no TUI RFCOMM preflight yet.
 - Not a replacement for the official app: OTA, find-my, gesture customization, and some features are not implemented.
 - Protocol behavior is reconstructed from observed traffic; unverified models may differ.

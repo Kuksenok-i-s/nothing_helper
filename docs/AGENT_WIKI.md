@@ -33,7 +33,7 @@ When unsure about device-specific protocol behaviour (undocumented opcodes, new 
 | CLI flags | [cli-flags.md](agent/cli-flags.md) |
 | Task workflows | [workflows.md](agent/workflows.md) |
 | Critical invariants | [invariants.md](agent/invariants.md) |
-| Testing, build tags, packaging | [development.md](agent/development.md) |
+| Testing, build tags, packaging, CI | [development.md](agent/development.md) |
 | Topic → source file map | [hot-files.md](agent/hot-files.md) |
 | SocratiCode search | [socraticode.md](agent/socraticode.md) |
 | PR checklist | [pr-checklist.md](agent/pr-checklist.md) |

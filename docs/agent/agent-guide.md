@@ -31,6 +31,7 @@ Operating rules for AI agents in **tws_manager**.
 | TUI-only layout | `internal/ui/tui` | session internals |
 | Gio-only layout | `internal/ui/gio/view`, `internal/ui/gio/state` | session internals |
 | Flags / bootstrap | `internal/app` | — |
+| Packaging / CI change | `Makefile`, `packaging/`, `.github/workflows/` — see [development.md](development.md) | — |
 | Input validation | `internal/security` | ad-hoc regex in UI |
 
 ## Decision tree

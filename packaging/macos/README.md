@@ -89,3 +89,7 @@ First Bluetooth API use triggers the macOS Privacy → Bluetooth prompt. Denied 
 ## Notarization (optional)
 
 For distribution outside your machine, sign with a Developer ID certificate and notarize via `notarytool`. Ad-hoc signing (`codesign -s -`) is sufficient for local development.
+
+## CI release
+
+On tag `v*` (or manual **Actions → Release macOS client**), GitHub Actions runs `make package-macos` on `macos-14` and publishes `dist/tws_manager-<version>-universal.dmg` to GitHub Releases. Version comes from [scripts/pkg-version.sh](../../scripts/pkg-version.sh).

@@ -1,8 +1,8 @@
 # Overview
 
-**For agents:** local Linux-only Bluetooth client. No network API. Default safe mode. Read [agent-guide.md](agent-guide.md) and [invariants.md](invariants.md) before editing.
+**For agents:** local Bluetooth client (Linux primary; macOS Gio experimental). No network API. Default safe mode. Read [agent-guide.md](agent-guide.md) and [invariants.md](invariants.md) before editing.
 
-**tws_manager** talks to Nothing/CMF earbuds over RFCOMM SPP via `/dev/rfcommN` and BlueZ.
+**tws_manager** talks to Nothing/CMF earbuds over RFCOMM SPP. On Linux: `/dev/rfcommN` and BlueZ. On macOS: IOBluetooth (experimental).
 
 | Capability | Details |
 |------------|---------|

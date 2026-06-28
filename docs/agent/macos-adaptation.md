@@ -154,7 +154,7 @@ Implementation path for Go: **CGO + Objective-C bridge** (no mature pure-Go IOBl
 
 1. **Reconnect reliability** — macOS `bluetoothd` RFCOMM state can stick after disconnect (documented for third-party SPP devices). Mitigation: explicit channel close, backoff, user-facing “toggle Bluetooth” hint.
 2. **IOBluetooth deprecation** — Apple steers new apps to CoreBluetooth (BLE). Classic RFCOMM remains available but is legacy; acceptable for a desktop accessory tool, not App Store–friendly long term.
-3. **CGO complexity** — cross-compilation from Linux CI impossible; macOS builds require macOS runner.
+3. **CGO complexity** — macOS Gio/universal builds require a macOS runner (`release-client-macos.yml`, `ci.yml`); cross-compilation from Linux CI is not used for DMG releases.
 4. **Dual connection** — earbuds may already hold an ACL for A2DP; RFCOMM open must coexist (usually fine for BR/EDR accessories).
 
 ### Hardware spike procedure (when hardware available)
