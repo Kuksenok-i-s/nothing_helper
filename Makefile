@@ -50,6 +50,8 @@ install-deps-debian:
 		bluez \
 		bluez-tools \
 		build-essential \
+		debhelper \
+		dpkg-dev \
 		libayatana-appindicator3-dev \
 		libegl1-mesa-dev \
 		libgl1-mesa-dev \
@@ -60,7 +62,9 @@ install-deps-debian:
 		libvulkan-dev \
 		libwayland-dev \
 		libx11-dev \
+		libx11-xcb-dev \
 		libxcursor-dev \
+		libxfixes-dev \
 		libxi-dev \
 		libxinerama-dev \
 		libxkbcommon-dev \

@@ -2,7 +2,11 @@ Source: tws_manager
 Section: utils
 Priority: optional
 Maintainer: tws_manager maintainers <kuksyenok.i.s@gmail.com>
-Build-Depends: debhelper-compat (= 13), golang-any, pkg-config, libayatana-appindicator3-dev, libgtk-3-dev, libvulkan-dev
+Build-Depends: debhelper-compat (= 13), golang-any, pkg-config,
+ libayatana-appindicator3-dev, libegl1-mesa-dev, libgl1-mesa-dev,
+ libgles2-mesa-dev, libgtk-3-dev, libvulkan-dev, libwayland-dev,
+ libx11-dev, libx11-xcb-dev, libxcursor-dev, libxfixes-dev, libxi-dev,
+ libxinerama-dev, libxkbcommon-dev, libxkbcommon-x11-dev, libxrandr-dev
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
 

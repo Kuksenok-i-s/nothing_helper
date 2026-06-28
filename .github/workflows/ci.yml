@@ -63,8 +63,8 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Install packaging tools
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev debhelper golang-go pkg-config libayatana-appindicator3-dev libgtk-3-dev libvulkan-dev
+      - name: Install build dependencies
+        run: sudo make install-deps-debian
 
       - name: Build Debian package
         env:
