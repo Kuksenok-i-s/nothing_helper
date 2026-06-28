@@ -1,7 +1,5 @@
-tws_manager (0.1.0-1) unstable; urgency=medium
+tws-manager (1.1-1) unstable; urgency=medium
 
-  * Initial package with Gio autostart and polkit RFCOMM helper.
-  * Improve postinst: reliably create group and add likely desktop user,
-    with explicit manual fallback instructions.
+  * Release 1.1.
 
- -- tws_manager maintainers <kuksyenok.i.s@gmail.com>  Fri, 05 Jun 2026 17:33:00 +0300
+ -- tws_manager maintainers <kuksyenok.i.s@gmail.com>  Sun, 28 Jun 2026 19:51:46 +0300

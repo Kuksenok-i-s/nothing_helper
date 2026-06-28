@@ -1,4 +1,6 @@
-.PHONY: help install-deps install-deps-debian run run-systray run-gio run-gio-lite run-gio-systray build build-systray build-gio build-gio-lite build-gio-systray build-helper build-gio-package prepare-debian package-deb package-arch package-rpm package-macos client-bundle-linux install-local vet test test-race check fmt lint clean profile-gio profile-gio-web sample-macos-app
+.PHONY: help install-deps install-deps-debian run run-systray run-gio run-gio-lite run-gio-systray build build-systray build-gio build-gio-lite build-gio-systray build-helper build-gio-package prepare-debian debian-changelog package-deb package-arch package-arch-real package-rpm package-macos client-bundle-linux install-local vet test test-race check fmt lint clean profile-gio profile-gio-web sample-macos-app
+
+ARCH_BUILD_USER ?= builduser
 
 BINARY ?= tws_manager
 BINARY_GIO ?= tws_manager_gio
@@ -113,19 +115,33 @@ build-gio-package: build-gio build-helper build
 prepare-debian:
 	ln -sfn "$(CURDIR)/packaging/debian" "$(CURDIR)/debian"
 
-package-deb: build-gio-package prepare-debian
+debian-changelog:
+	./scripts/set-debian-changelog.sh
+
+package-deb: build-gio-package debian-changelog prepare-debian
 	dpkg-buildpackage -us -uc -b -d
 	@mkdir -p dist
-	@cp ../tws_manager_*.deb dist/ 2>/dev/null || true
+	@cp ../tws-manager_*.deb dist/ 2>/dev/null || true
 
 client-bundle-linux: build-gio-package
 	@mkdir -p dist
-	@version="$${PKG_VERSION:-$$(./scripts/pkg-version.sh 2>/dev/null || echo 0.1.0)}"; \
+	@version="$$(./scripts/pkg-version.sh)"; \
 	arch="$${ARCH:-amd64}"; \
 	tar -czf "dist/tws_manager-$${version}-linux-$${arch}.tar.gz" \
 		-C bin tws_manager tws_manager_gio tws_manager_rfcomm_helper
 
+# makepkg refuses to run as root; CI Arch containers start as root.
 package-arch:
+	@if [ "$$(id -u)" -eq 0 ]; then \
+		root_dir="$$(pwd)"; \
+		getent passwd "$(ARCH_BUILD_USER)" >/dev/null 2>&1 || useradd -m -s /bin/bash "$(ARCH_BUILD_USER)"; \
+		chown -R "$(ARCH_BUILD_USER):$(ARCH_BUILD_USER)" "$$root_dir"; \
+		su "$(ARCH_BUILD_USER)" -c "cd \"$$root_dir\" && $(MAKE) package-arch-real"; \
+	else \
+		$(MAKE) package-arch-real; \
+	fi
+
+package-arch-real:
 	cd packaging/arch && makepkg -sf --noconfirm
 	@mkdir -p dist
 	@cp packaging/arch/tws_manager-*.pkg.tar.zst dist/ 2>/dev/null || true

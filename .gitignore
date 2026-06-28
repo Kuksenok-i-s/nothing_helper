@@ -25,5 +25,6 @@ dist/
 packaging/arch/pkg/
 packaging/arch/src/
 packaging/arch/*.pkg.tar.*
+packaging/debian/changelog
 scripts/node_modules/
 scripts/macos/.venv/

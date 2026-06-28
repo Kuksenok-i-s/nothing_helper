@@ -1,4 +1,4 @@
-Source: tws_manager
+Source: tws-manager
 Section: utils
 Priority: optional
 Maintainer: tws_manager maintainers <kuksyenok.i.s@gmail.com>
@@ -10,7 +10,7 @@ Build-Depends: debhelper-compat (= 13), golang-any, pkg-config,
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
 
-Package: tws_manager
+Package: tws-manager
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}, bluez, bluez-tools, policykit-1, libnotify-bin, libayatana-appindicator3-1
 Description: TWS RFCOMM desktop client
