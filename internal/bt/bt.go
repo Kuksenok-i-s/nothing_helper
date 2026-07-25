@@ -100,9 +100,14 @@ func BluetoothInfo(mac string) (string, error) {
 }
 
 // IsDeviceConnected reports whether bluetoothctl lists the device as Connected: yes.
+// A missing BlueZ device ("not available") is treated as disconnected, not an error,
+// so stale RFCOMM→MAC mappings can fall back to rediscovery.
 func IsDeviceConnected(mac string) (bool, error) {
 	info, err := BluetoothInfo(mac)
 	if err != nil {
+		if isBluetoothDeviceUnavailable(err) {
+			return false, nil
+		}
 		return false, err
 	}
 	return deviceConnectedFromInfo(info), nil

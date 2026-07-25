@@ -3,10 +3,25 @@
 package bt
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "tws-bt-config-*")
+	if err != nil {
+		panic(err)
+	}
+	path := filepath.Join(dir, "devices.json")
+	SetConfigPathHook(func() string { return path })
+	code := m.Run()
+	SetConfigPathHook(nil)
+	_ = os.RemoveAll(dir)
+	os.Exit(code)
+}
 
 func TestRememberAndLookupDeviceMAC(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "devices.json")
@@ -31,6 +46,19 @@ func TestLookupDeviceMACMissing(t *testing.T) {
 
 	if _, ok := LookupDeviceMAC("/dev/rfcomm0"); ok {
 		t.Fatal("expected missing MAC")
+	}
+}
+
+func TestIsDeviceConnectedTreatsUnavailableAsDisconnected(t *testing.T) {
+	old := execCombinedOutput
+	execCombinedOutput = func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		return []byte("Device AA:BB:CC:DD:EE:FF not available\nDeviceSet AA:BB:CC:DD:EE:FF not available\n"), fmt.Errorf("exit status 1")
+	}
+	t.Cleanup(func() { execCombinedOutput = old })
+
+	ok, err := IsDeviceConnected("AA:BB:CC:DD:EE:FF")
+	if err != nil || ok {
+		t.Fatalf("IsDeviceConnected() = %v, %v; want false, nil", ok, err)
 	}
 }
 

@@ -139,6 +139,52 @@ func TestConnectBestExistingRFCOMMNoMAC(t *testing.T) {
 	}
 }
 
+func TestConnectBestExistingStaleMACRescans(t *testing.T) {
+	const stale, live = "AA:BB:CC:DD:EE:FF", "2C:BE:EE:4A:EC:9E"
+	cfgPath := t.TempDir() + "/devices.json"
+	bt.SetConfigPathHook(func() string { return cfgPath })
+	t.Cleanup(func() { bt.SetConfigPathHook(nil) })
+	if err := bt.RememberDeviceMAC("/dev/rfcomm0", stale); err != nil {
+		t.Fatal(err)
+	}
+
+	var boundMAC string
+	mgr := New(session.New(nil, false, false), Options{RFCOMMPath: "/dev/rfcomm0", Channel: 15})
+	autoTestHooksVar = &autoTestHooks{
+		rfcommExists: func(m *Manager) (bool, error) { return true, nil },
+		discover: func(m *Manager, ctx context.Context) ([]bt.Device, error) {
+			return []bt.Device{{MAC: live, Connected: true, SPP: true, Name: "Nothing Ear (3)"}}, nil
+		},
+		bind: func(m *Manager, ctx context.Context, dev bt.Device) error {
+			boundMAC = dev.MAC
+			return nil
+		},
+		connect: func(m *Manager, ctx context.Context, dev bt.Device) error { return nil },
+	}
+	t.Cleanup(func() { autoTestHooksVar = nil })
+
+	oldConnected := hookIsDeviceConnected
+	oldOutput := hookIsDefaultAudioOutput
+	hookIsDeviceConnected = func(mac string) (bool, error) {
+		return mac == live, nil
+	}
+	hookIsDefaultAudioOutput = func(_ context.Context, mac string) (bool, error) {
+		return mac == live, nil
+	}
+	t.Cleanup(func() {
+		hookIsDeviceConnected = oldConnected
+		hookIsDefaultAudioOutput = oldOutput
+	})
+
+	var statuses []string
+	if err := mgr.ConnectBest(context.Background(), func(msg string) { statuses = append(statuses, msg) }); err != nil {
+		t.Fatalf("ConnectBest() = %v statuses=%v", err, statuses)
+	}
+	if boundMAC != live {
+		t.Fatalf("bound MAC=%q want %s statuses=%v", boundMAC, live, statuses)
+	}
+}
+
 func TestConnectBestDiscoverAndBind(t *testing.T) {
 	const mac = "11:22:33:44:55:66"
 	mgr := New(session.New(nil, false, false), Options{RFCOMMPath: "/dev/rfcomm0", Channel: 15})

@@ -3,6 +3,7 @@ package bt
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var (
@@ -49,4 +50,13 @@ func wrapRFCOMMPermission(err error) error {
 		return nil
 	}
 	return fmt.Errorf("%w: %w", ErrRFCOMMPermission, err)
+}
+
+// isBluetoothDeviceUnavailable reports BlueZ "Device … not available" / DeviceSet errors.
+func isBluetoothDeviceUnavailable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "not available") || strings.Contains(msg, "deviceset")
 }

@@ -151,9 +151,22 @@ func (m *Manager) ConnectBest(ctx context.Context, status func(string)) error {
 func (m *Manager) connectBestExisting(ctx context.Context, status func(string)) error {
 	dev := m.DeviceForExistingRFCOMM("")
 	if dev.MAC != "" {
-		return m.connectViaExisting(ctx, dev, status)
+		err := m.connectViaExisting(ctx, dev, status)
+		// Keep waiting when this MAC is up but not yet the audio sink.
+		if err == nil || errors.Is(err, errWaitingForAudioOutput) {
+			return err
+		}
+		// Stale RFCOMM→MAC mapping (or buds unknown to BlueZ): rediscover and rebind.
+		if ctx.Err() == nil {
+			status("auto: saved device " + dev.MAC + " unavailable; rescanning")
+		}
+	} else {
+		status("auto: existing " + m.opts.RFCOMMPath + " has no saved MAC; scanning for device metadata")
 	}
-	status("auto: existing " + m.opts.RFCOMMPath + " has no saved MAC; scanning for device metadata")
+	return m.rebindExistingToBest(ctx, status)
+}
+
+func (m *Manager) rebindExistingToBest(ctx context.Context, status func(string)) error {
 	dev, ok, err := m.discoverBestDevice(ctx, status)
 	if err != nil || !ok {
 		return err
