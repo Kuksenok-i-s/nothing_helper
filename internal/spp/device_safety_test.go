@@ -84,3 +84,15 @@ func TestValidateScanRange(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestParseEQModeArgAndBuildPayload(t *testing.T) {
+	model, _ := ResolveModelInfo("EarThree")
+	mode, err := ParseEQModeArg(model, "3")
+	if err != nil || mode != 3 {
+		t.Fatalf("ParseEQModeArg() = %d, %v", mode, err)
+	}
+	payload, err := BuildEQSetPayload(model, []string{"3"})
+	if err != nil || len(payload) == 0 {
+		t.Fatalf("BuildEQSetPayload() = %v, %v", payload, err)
+	}
+}

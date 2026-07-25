@@ -134,41 +134,45 @@ func parseStatusPacket(kind string) PacketParser {
 				Summary: fmt.Sprintf("%s: rsp=%02x payload=% x", kind, pkt.RspCode(), pkt.Payload),
 			}
 		}
-
-		parts := make([]string, 0, len(pairs))
-		for _, p := range pairs {
-			name, known := partNames[p[0]]
-			if !known {
-				name = fmt.Sprintf("id_%d", p[0])
-			}
-			v := p[1]
-			var flags []string
-			if p[0] == 4 { // case: bit0 = lid open
-				if v&0x01 != 0 {
-					flags = append(flags, "open")
-				} else {
-					flags = append(flags, "closed")
-				}
-			} else {
-				if v&0x04 != 0 {
-					flags = append(flags, "in_ear")
-				} else if v&0x01 != 0 {
-					flags = append(flags, "in_case")
-				} else {
-					flags = append(flags, "out")
-				}
-				if v&0x80 != 0 {
-					flags = append(flags, "connected")
-				}
-			}
-			parts = append(parts, fmt.Sprintf("%s[%s]", name, strings.Join(flags, ",")))
-		}
-
 		return ParsedPacket{
 			Kind:    kind,
-			Summary: fmt.Sprintf("%s: %s", kind, strings.Join(parts, " ")),
+			Summary: fmt.Sprintf("%s: %s", kind, strings.Join(formatStatusParts(pairs), " ")),
 		}
 	}
+}
+
+func formatStatusParts(pairs [][2]byte) []string {
+	parts := make([]string, 0, len(pairs))
+	for _, p := range pairs {
+		name, known := partNames[p[0]]
+		if !known {
+			name = fmt.Sprintf("id_%d", p[0])
+		}
+		parts = append(parts, fmt.Sprintf("%s[%s]", name, formatStatusFlags(p[0], p[1])))
+	}
+	return parts
+}
+
+func formatStatusFlags(id, v byte) string {
+	if id == 4 {
+		if v&0x01 != 0 {
+			return "open"
+		}
+		return "closed"
+	}
+	var flags []string
+	switch {
+	case v&0x04 != 0:
+		flags = append(flags, "in_ear")
+	case v&0x01 != 0:
+		flags = append(flags, "in_case")
+	default:
+		flags = append(flags, "out")
+	}
+	if v&0x80 != 0 {
+		flags = append(flags, "connected")
+	}
+	return strings.Join(flags, ",")
 }
 
 var configTypeLabels = map[int]string{
@@ -184,54 +188,67 @@ var configTypeLabels = map[int]string{
 // count byte followed by newline-separated "device,type,value" CSV records.
 func parseConfigPacket(kind string) PacketParser {
 	return func(pkt Packet, model ModelInfo) ParsedPacket {
-		if len(pkt.Payload) < 1 {
-			return ParsedPacket{Kind: kind, Summary: kind + ": (empty)"}
-		}
-
-		text := strings.TrimSpace(string(pkt.Payload[1:]))
-		grouped := map[byte][]string{}
-		order := []byte{}
-		for _, line := range strings.Split(text, "\n") {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-			fields := strings.SplitN(line, ",", 3)
-			if len(fields) != 3 {
-				continue
-			}
-			dev, err1 := strconv.Atoi(fields[0])
-			typ, err2 := strconv.Atoi(fields[1])
-			val := fields[2]
-			if err1 != nil || err2 != nil || val == "" {
-				continue
-			}
-			label, ok := configTypeLabels[typ]
-			if !ok {
-				label = fmt.Sprintf("type_%d", typ)
-			}
-			id := byte(dev)
-			if _, seen := grouped[id]; !seen {
-				order = append(order, id)
-			}
-			grouped[id] = append(grouped[id], fmt.Sprintf("%s=%s", label, val))
-		}
-
-		parts := make([]string, 0, len(order))
-		for _, id := range order {
-			name, known := partNames[id]
-			if !known {
-				name = fmt.Sprintf("id_%d", id)
-			}
-			parts = append(parts, fmt.Sprintf("%s{%s}", name, strings.Join(grouped[id], ", ")))
-		}
-
-		return ParsedPacket{
-			Kind:    kind,
-			Text:    text,
-			Summary: fmt.Sprintf("%s: %s", kind, strings.Join(parts, " ")),
-		}
+		return summarizeConfigPacket(kind, pkt.Payload)
 	}
+}
+
+func summarizeConfigPacket(kind string, payload []byte) ParsedPacket {
+	if len(payload) < 1 {
+		return ParsedPacket{Kind: kind, Summary: kind + ": (empty)"}
+	}
+	text := strings.TrimSpace(string(payload[1:]))
+	order, grouped := groupConfigLines(text)
+	parts := make([]string, 0, len(order))
+	for _, id := range order {
+		name, known := partNames[id]
+		if !known {
+			name = fmt.Sprintf("id_%d", id)
+		}
+		parts = append(parts, fmt.Sprintf("%s{%s}", name, strings.Join(grouped[id], ", ")))
+	}
+	return ParsedPacket{
+		Kind:    kind,
+		Text:    text,
+		Summary: fmt.Sprintf("%s: %s", kind, strings.Join(parts, " ")),
+	}
+}
+
+func groupConfigLines(text string) ([]byte, map[byte][]string) {
+	grouped := map[byte][]string{}
+	order := []byte{}
+	for _, line := range strings.Split(text, "\n") {
+		id, entry, ok := parseConfigCSVLine(line)
+		if !ok {
+			continue
+		}
+		if _, seen := grouped[id]; !seen {
+			order = append(order, id)
+		}
+		grouped[id] = append(grouped[id], entry)
+	}
+	return order, grouped
+}
+
+func parseConfigCSVLine(line string) (byte, string, bool) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return 0, "", false
+	}
+	fields := strings.SplitN(line, ",", 3)
+	if len(fields) != 3 {
+		return 0, "", false
+	}
+	dev, err1 := strconv.Atoi(fields[0])
+	typ, err2 := strconv.Atoi(fields[1])
+	val := fields[2]
+	if err1 != nil || err2 != nil || val == "" {
+		return 0, "", false
+	}
+	label, ok := configTypeLabels[typ]
+	if !ok {
+		label = fmt.Sprintf("type_%d", typ)
+	}
+	return byte(dev), fmt.Sprintf("%s=%s", label, val), true
 }
 
 func parseSupportedFeaturePacket(kind string) PacketParser {
@@ -306,25 +323,29 @@ func parseANCPacket(kind string) PacketParser {
 				Summary: fmt.Sprintf("%s: rsp=%02x payload=% x", kind, pkt.RspCode(), p),
 			}
 		}
-		mode, level := "", ""
-		for i := 0; i+2 < len(p); i += 3 {
-			switch p[i] {
-			case 1:
-				mode = ancModeLabel(p[i+1])
-			case 2:
-				if label, ok := ancLevelLabels[p[i+1]]; ok {
-					level = label
-				} else {
-					level = fmt.Sprintf("level_%d", p[i+1])
-				}
-			}
-		}
+		mode, level := summarizeANCTriples(p)
 		summary := fmt.Sprintf("%s: mode=%s", kind, mode)
 		if level != "" {
 			summary += " last_level=" + level
 		}
 		return ParsedPacket{Kind: kind, Summary: summary}
 	}
+}
+
+func summarizeANCTriples(p []byte) (mode, level string) {
+	for i := 0; i+2 < len(p); i += 3 {
+		switch p[i] {
+		case 1:
+			mode = ancModeLabel(p[i+1])
+		case 2:
+			if label, ok := ancLevelLabels[p[i+1]]; ok {
+				level = label
+			} else {
+				level = fmt.Sprintf("level_%d", p[i+1])
+			}
+		}
+	}
+	return mode, level
 }
 
 // EQ preset (GET_EQ_MODE, rsp 0x401F): single byte preset index.
@@ -493,38 +514,57 @@ func parseDualDeviceRecords(payload []byte, count int) ([]DualDevice, error) {
 	devices := make([]DualDevice, 0, count)
 	off := 0
 	for i := 0; i < count; i++ {
-		if off+7 > len(payload) {
-			return nil, fmt.Errorf("dual list truncated: want %d records, parsed %d", count, i)
+		dev, n, err := parseDualDeviceRecord(payload, off, count-i-1)
+		if err != nil {
+			return nil, err
 		}
-		state := payload[off]
-		macBytes := payload[off+1 : off+7]
-		off += 7
-
-		name := ""
-		if off < len(payload) {
-			nameLen := int(payload[off] & 0x7F)
-			remainingDevices := count - i - 1
-			if nameLen <= 31 && off+1+nameLen <= len(payload) && len(payload)-(off+1+nameLen) >= remainingDevices*7 {
-				name = cleanDualDeviceName(payload[off+1 : off+1+nameLen])
-				off += 1 + nameLen
-			} else if off+31 <= len(payload) && len(payload)-(off+31) >= remainingDevices*7 {
-				name = cleanDualDeviceName(payload[off : off+31])
-				off += 31
-			}
-		}
-
-		devices = append(devices, DualDevice{
-			MAC:       formatDualMAC(macBytes),
-			Name:      name,
-			Connected: state&0x0F != 0,
-			Owner:     state&0xF0 != 0,
-			RawState:  state,
-		})
+		devices = append(devices, dev)
+		off = n
 	}
 	if len(devices) != count {
 		return nil, fmt.Errorf("dual list truncated: want %d records, parsed %d", count, len(devices))
 	}
 	return devices, nil
+}
+
+func parseDualDeviceRecord(payload []byte, off, remainingDevices int) (DualDevice, int, error) {
+	if off+7 > len(payload) {
+		return DualDevice{}, off, fmt.Errorf("dual list truncated: want record at offset %d", off)
+	}
+	state := payload[off]
+	macBytes := payload[off+1 : off+7]
+	off += 7
+	name, off := parseDualDeviceNameField(payload, off, remainingDevices)
+	return DualDevice{
+		MAC:       formatDualMAC(macBytes),
+		Name:      name,
+		Connected: state&0x0F != 0,
+		Owner:     state&0xF0 != 0,
+		RawState:  state,
+	}, off, nil
+}
+
+func parseDualDeviceNameWithLen(payload []byte, off, remainingDevices int) (string, int, bool) {
+	nameLen := int(payload[off] & 0x7F)
+	if nameLen > 31 || off+1+nameLen > len(payload) || len(payload)-(off+1+nameLen) < remainingDevices*7 {
+		return "", off, false
+	}
+	name := cleanDualDeviceName(payload[off+1 : off+1+nameLen])
+	return name, off + 1 + nameLen, true
+}
+
+func parseDualDeviceNameField(payload []byte, off, remainingDevices int) (string, int) {
+	if off >= len(payload) {
+		return "", off
+	}
+	if name, next, ok := parseDualDeviceNameWithLen(payload, off, remainingDevices); ok {
+		return name, next
+	}
+	if off+31 > len(payload) || len(payload)-(off+31) < remainingDevices*7 {
+		return "", off
+	}
+	name := cleanDualDeviceName(payload[off : off+31])
+	return name, off + 31
 }
 
 func FormatDualDeviceSummaries(devices []DualDevice) []string {
@@ -646,20 +686,28 @@ func printableText(payload []byte) (string, bool) {
 	if len(payload) == 0 || !utf8.Valid(payload) {
 		return "", false
 	}
-
-	text := payload
-	for len(text) > 0 {
-		r, size := utf8.DecodeRune(text)
-		if r == utf8.RuneError && size == 1 {
-			return "", false
-		}
-		if r != '\n' && r != '\r' && r != '\t' && !unicode.IsPrint(r) {
-			return "", false
-		}
-		text = text[size:]
+	if !isPrintableRunes(payload) {
+		return "", false
 	}
-
 	return string(payload), true
+}
+
+func isPrintableRunes(payload []byte) bool {
+	for len(payload) > 0 {
+		r, size := utf8.DecodeRune(payload)
+		if !runeIsPrintableOrWhitespace(r, size) {
+			return false
+		}
+		payload = payload[size:]
+	}
+	return true
+}
+
+func runeIsPrintableOrWhitespace(r rune, size int) bool {
+	if r == utf8.RuneError && size == 1 {
+		return false
+	}
+	return r == '\n' || r == '\r' || r == '\t' || unicode.IsPrint(r)
 }
 
 func ReadPacket(r io.Reader) ([]byte, error) {
@@ -676,33 +724,36 @@ func ReadPacket(r io.Reader) ([]byte, error) {
 			}
 			continue
 		}
-		buf := []byte{SOF}
-			headerRest, err := readExact(r, 7)
-			if err != nil {
-				return nil, err
-			}
-			buf = append(buf, headerRest...)
-
-			length := int(getUint16LE(buf, 5))
-			if length > MaxPayloadLen {
-				return nil, fmt.Errorf("payload length too large: %d", length)
-			}
-
-			payload, err := readExact(r, length)
-			if err != nil {
-				return nil, err
-			}
-			buf = append(buf, payload...)
-
-			if getUint16LE(buf, 1)&ControlCRC != 0 {
-				crc, err := readExact(r, 2)
-				if err != nil {
-					return nil, err
-				}
-				buf = append(buf, crc...)
-			}
-
-			return buf, nil
+		return readPacketFromSOF(r, b)
 	}
 }
 
+func readPacketFromSOF(r io.Reader, sof []byte) ([]byte, error) {
+	buf := append([]byte(nil), sof...)
+	headerRest, err := readExact(r, 7)
+	if err != nil {
+		return nil, err
+	}
+	buf = append(buf, headerRest...)
+
+	length := int(getUint16LE(buf, 5))
+	if length > MaxPayloadLen {
+		return nil, fmt.Errorf("payload length too large: %d", length)
+	}
+
+	payload, err := readExact(r, length)
+	if err != nil {
+		return nil, err
+	}
+	buf = append(buf, payload...)
+
+	if getUint16LE(buf, 1)&ControlCRC != 0 {
+		crc, err := readExact(r, 2)
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, crc...)
+	}
+
+	return buf, nil
+}

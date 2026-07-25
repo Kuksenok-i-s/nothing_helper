@@ -84,7 +84,7 @@ func run(ctx context.Context, rt *app.Runtime, stop context.CancelFunc) error {
 		PCPrimary:     services.PCPrimaryMode,
 		HideToTray:    hideToTray(),
 		ShowCh:        showCh,
-		OnQuit: func() { _ = rt.Shutdown(context.Background()) },
+		OnQuit:        func() { _ = rt.Shutdown(context.Background()) },
 	})
 }
 

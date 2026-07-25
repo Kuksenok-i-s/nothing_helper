@@ -15,7 +15,7 @@ func TestLoggerRedactsRawByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 
 	pkt := spp.Packet{Cmd: spp.CmdGetBattery}
 	tr.LogTX([]byte{0x55, 0x60, 0x01, 0x01, 0xc0, 0x07, 0x00, 0x00, 0x00, 0xe9, 0xbf}, pkt, Context{})

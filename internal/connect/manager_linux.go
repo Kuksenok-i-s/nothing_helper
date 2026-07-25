@@ -22,8 +22,13 @@ func (m *Manager) RFCOMMExists() (bool, error) {
 	return false, fmt.Errorf("check %q: %w", m.opts.RFCOMMPath, err)
 }
 
+var managerBindHook func(m *Manager, ctx context.Context, device bt.Device) error
+
 // Bind creates the RFCOMM device node for the given Bluetooth device.
 func (m *Manager) Bind(ctx context.Context, device bt.Device) error {
+	if managerBindHook != nil {
+		return managerBindHook(m, ctx, device)
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}

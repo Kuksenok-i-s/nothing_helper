@@ -79,8 +79,16 @@ func onReady(ctx context.Context, s *session.Session, opts Options) {
 	}()
 
 	go func() {
-		for range events {
-			apply(s.Snapshot(), status, battery)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case _, ok := <-events:
+				if !ok {
+					return
+				}
+				apply(s.Snapshot(), status, battery)
+			}
 		}
 	}()
 }

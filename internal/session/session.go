@@ -3,11 +3,11 @@ package session
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +16,8 @@ import (
 	"tws_manager/internal/spp"
 	"tws_manager/internal/trace"
 )
+
+var hookOpenTransport = bt.OpenTransport
 
 type EventKind string
 
@@ -67,6 +69,8 @@ const (
 	probeBatteryDelay  = 3 * time.Second
 	probeConfigStep    = 400 * time.Millisecond
 )
+
+var probeSleep = time.Sleep
 
 type pendingTX struct {
 	command string
@@ -218,87 +222,68 @@ func (s *Session) autoDetectModelFromPacketLocked(device bt.Device, pkt spp.Pack
 }
 
 func (s *Session) Connect(device bt.Device, transportRef string, channel int) error {
-	if device.MAC != "" {
-		if mac, err := security.NormalizeMAC(device.MAC); err != nil {
-			return err
-		} else {
-			device.MAC = mac
-		}
+	device, err := normalizeConnectMAC(device)
+	if err != nil {
+		return err
 	}
 
 	s.connectMu.Lock()
 	defer s.connectMu.Unlock()
 
-	// Idempotency guard: a second connect to the same device while a live link
-	// exists would reopen transport and churn the RFCOMM session (duplicate
-	// read loops and probes), which can wedge the earbuds. Skip it.
-	s.mu.Lock()
-	alreadyConnected := s.transport != nil && device.MAC != "" && s.device.MAC == device.MAC
-	currentName := s.device.Name
-	s.mu.Unlock()
-	if alreadyConnected {
-		name := currentName
-		if name == "" {
-			name = device.MAC
-		}
-		s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: fmt.Sprintf("already connected to %s", name)})
+	if s.connectAlreadyLinked(device) {
 		return nil
 	}
 
-	if transportRef != "" {
-		if _, err := security.ValidateTransportRef(transportRef); err != nil {
-			return err
-		}
-	}
-	if err := security.ValidateChannel(channel); err != nil {
+	device, channel, label, err := prepareConnectDevice(device, transportRef, channel)
+	if err != nil {
 		return err
-	}
-
-	if device.MAC == "" {
-		if mac, ok := bt.LookupDeviceMAC(transportRef); ok {
-			device.MAC = mac
-			if device.Name == "" || device.Name == transportRef {
-				device.Name = mac
-			}
-		}
-	}
-
-	if device.MAC != "" && (device.Info == "" || device.Name == "" || strings.EqualFold(device.Name, device.MAC)) {
-		device = bt.EnrichDeviceInfo(device)
 	}
 
 	progress := func(step string) {
 		s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: step})
 	}
 
-	channel = bt.ResolveDeviceChannel(device.MAC, channel)
-	label := transportRef
-	if label == "" && device.MAC != "" {
-		label = device.MAC
-	}
 	s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: fmt.Sprintf("opening %s (channel %d)", label, channel)})
-	transport, usedChannel, err := bt.OpenTransport(transportRef, device.MAC, channel, progress)
+	transport, usedChannel, err := hookOpenTransport(transportRef, device.MAC, channel, progress)
 	if err != nil {
 		s.publish(Event{Kind: EventError, Device: device, Error: err})
 		return err
 	}
-	s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: fmt.Sprintf("opened %s on channel %d", transport.String(), usedChannel)})
-	var modelEvent *trace.Event
+	s.installConnectTransport(device, transportRef, transport, usedChannel)
+	return nil
+}
+
+func normalizeConnectMAC(device bt.Device) (bt.Device, error) {
+	if device.MAC == "" {
+		return device, nil
+	}
+	mac, err := security.NormalizeMAC(device.MAC)
+	if err != nil {
+		return device, err
+	}
+	device.MAC = mac
+	return device, nil
+}
+
+func (s *Session) connectAlreadyLinked(device bt.Device) bool {
 	s.mu.Lock()
-	if s.transport != nil {
-		_ = s.transport.Close()
-	}
-	s.transport = transport
-	device.Channel = usedChannel
-	s.device = device
-	s.clearLiveStateLocked()
-	modelEvent = s.autoDetectModelLocked(device)
-	if s.rawCapture != nil {
-		_ = s.rawCapture.Close()
-		s.rawCapture = nil
-	}
-	rawPath := s.openRawCaptureLocked()
+	alreadyConnected := s.transport != nil && device.MAC != "" && s.device.MAC == device.MAC
+	currentName := s.device.Name
 	s.mu.Unlock()
+	if !alreadyConnected {
+		return false
+	}
+	name := currentName
+	if name == "" {
+		name = device.MAC
+	}
+	s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: fmt.Sprintf("already connected to %s", name)})
+	return true
+}
+
+func (s *Session) installConnectTransport(device bt.Device, transportRef string, transport bt.Transport, usedChannel int) {
+	s.publish(Event{Kind: EventProgress, Device: device, Source: "connect", Trigger: fmt.Sprintf("opened %s on channel %d", transport.String(), usedChannel)})
+	modelEvent, rawPath := s.swapConnectTransport(device, transport, usedChannel)
 	if modelEvent != nil {
 		if s.logger != nil {
 			s.logger.LogEvent(*modelEvent)
@@ -319,35 +304,52 @@ func (s *Session) Connect(device bt.Device, transportRef string, channel int) er
 	if s.probeEnabled {
 		go s.initialProbe(device)
 	}
-	return nil
+}
+
+func (s *Session) swapConnectTransport(device bt.Device, transport bt.Transport, usedChannel int) (*trace.Event, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.transport != nil {
+		_ = s.transport.Close()
+	}
+	s.transport = transport
+	device.Channel = usedChannel
+	s.device = device
+	s.clearLiveStateLocked()
+	modelEvent := s.autoDetectModelLocked(device)
+	if s.rawCapture != nil {
+		_ = s.rawCapture.Close()
+		s.rawCapture = nil
+	}
+	return modelEvent, s.openRawCaptureLocked()
 }
 
 func (s *Session) initialProbe(device bt.Device) {
 	// Protocol handshake: activate the protocol via GET_PROTOCOL_VERSION
 	// (0xC001), then query host version (0xC042). Both are read-only queries;
 	// this wakes the device so it answers later GETs.
-	time.Sleep(handshakeDelay)
+	probeSleep(handshakeDelay)
 	if !s.isCurrentDevice(device) {
 		return
 	}
 	s.publish(Event{Kind: EventProgress, Device: device, Source: "handshake", Trigger: "activate protocol"})
 	_ = s.SendCommand(spp.CmdGetProtocolVersion, Meta{Source: "handshake", Trigger: "protocol version"})
 
-	time.Sleep(handshakeStep)
+	probeSleep(handshakeStep)
 	if !s.isCurrentDevice(device) {
 		return
 	}
 	s.publish(Event{Kind: EventProgress, Device: device, Source: "handshake", Trigger: "device version"})
 	_ = s.SendCommand(spp.CmdGetFirmwareVersion, Meta{Source: "handshake", Trigger: "device version"})
 
-	time.Sleep(probeIdentityDelay)
+	probeSleep(probeIdentityDelay)
 	if !s.isCurrentDevice(device) {
 		return
 	}
 	s.publish(Event{Kind: EventProgress, Device: device, Source: "probe_identity", Trigger: "sending identity probe"})
 	_ = s.SendCommand(spp.CmdGetIdentity, Meta{Source: "probe_identity", Trigger: "identity probe"})
 
-	time.Sleep(probeBatteryDelay)
+	probeSleep(probeBatteryDelay)
 	if !s.isCurrentDevice(device) {
 		return
 	}
@@ -374,7 +376,7 @@ func (s *Session) probeConfig(device bt.Device) {
 		{feature: "dual", cmd: spp.CmdGetDualDeviceList, payload: []byte{0}, trigger: "dual device list"},
 	}
 	for _, p := range probes {
-		time.Sleep(probeConfigStep)
+		probeSleep(probeConfigStep)
 		if !s.isCurrentDevice(device) {
 			return
 		}
@@ -394,22 +396,29 @@ func (s *Session) RunQueryScan(ctx context.Context, start, end uint16, delay tim
 	dev := s.Snapshot().Device
 	s.publish(Event{Kind: EventProgress, Device: dev, Source: "scan", Trigger: fmt.Sprintf("scan %04x..%04x every %s", start, end, delay)})
 	for cmd := start; cmd <= end; cmd++ {
-		if err := ctx.Err(); err != nil {
+		if err := s.runQueryScanStep(ctx, dev, cmd, delay); err != nil {
 			return err
 		}
-		if !s.isCurrentDevice(dev) {
-			return fmt.Errorf("disconnected during scan")
-		}
-		trigger := fmt.Sprintf("scan %04x", cmd)
-		s.publish(Event{Kind: EventProgress, Device: dev, Source: "scan", Trigger: trigger})
-		if err := s.SendCommand(cmd, Meta{Source: "scan", Trigger: trigger}); err != nil {
-			return err
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(delay):
-		}
+	}
+	return nil
+}
+
+func (s *Session) runQueryScanStep(ctx context.Context, dev bt.Device, cmd uint16, delay time.Duration) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !s.isCurrentDevice(dev) {
+		return fmt.Errorf("disconnected during scan")
+	}
+	trigger := fmt.Sprintf("scan %04x", cmd)
+	s.publish(Event{Kind: EventProgress, Device: dev, Source: "scan", Trigger: trigger})
+	if err := s.SendCommand(cmd, Meta{Source: "scan", Trigger: trigger}); err != nil {
+		return err
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(delay):
 	}
 	return nil
 }
@@ -420,6 +429,22 @@ func (s *Session) isCurrentDevice(device bt.Device) bool {
 	return s.transport != nil && s.device.MAC == device.MAC
 }
 
+func (s *Session) afterDelay(d time.Duration, fn func()) {
+	go func() {
+		t := time.NewTimer(d)
+		defer t.Stop()
+		<-t.C
+		fn()
+	}()
+}
+
+func (s *Session) AttachTestLink(transport bt.Transport, device bt.Device) {
+	s.mu.Lock()
+	s.transport = transport
+	s.device = device
+	s.mu.Unlock()
+}
+
 func (s *Session) Close() error {
 	s.mu.Lock()
 	transport := s.transport
@@ -427,22 +452,33 @@ func (s *Session) Close() error {
 	if transport == nil {
 		return nil
 	}
-	_, closeErr := s.finalizeDisconnect(transport, "shutdown", "RFCOMM closed", nil)
+	closeErr := s.finalizeDisconnect(transport, "shutdown", "RFCOMM closed", nil)
 	return closeErr
 }
 
 // finalizeDisconnect tears down the active RFCOMM link and live session state,
-// then publishes EventDisconnected. When f is non-nil it must match s.f unless
-// another goroutine already finalized the link (stale read loop).
-func (s *Session) finalizeDisconnect(transport bt.Transport, source, trigger string, err error) (bt.Device, error) {
-	s.mu.Lock()
-	if transport != nil && s.transport != transport {
-		s.mu.Unlock()
-		return bt.Device{}, nil
+// then publishes EventDisconnected. When transport is non-nil it must match
+// s.transport unless another goroutine already finalized the link (stale read loop).
+func (s *Session) finalizeDisconnect(transport bt.Transport, source, trigger string, err error) error {
+	wasConnected, dev, closeErr := s.closeActiveTransport(transport)
+	if wasConnected {
+		disconnectErr := err
+		if disconnectErr == nil {
+			disconnectErr = closeErr
+		}
+		s.publish(Event{Kind: EventDisconnected, Device: dev, Source: source, Trigger: trigger, Error: disconnectErr})
 	}
-	wasConnected := s.transport != nil
-	dev := s.device
-	var closeErr error
+	return closeErr
+}
+
+func (s *Session) closeActiveTransport(transport bt.Transport) (wasConnected bool, dev bt.Device, closeErr error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if transport != nil && s.transport != transport {
+		return false, bt.Device{}, nil
+	}
+	wasConnected = s.transport != nil
+	dev = s.device
 	if s.transport != nil {
 		closeErr = s.transport.Close()
 		s.transport = nil
@@ -454,15 +490,7 @@ func (s *Session) finalizeDisconnect(transport bt.Transport, source, trigger str
 	if wasConnected {
 		s.clearLiveStateLocked()
 	}
-	s.mu.Unlock()
-	if wasConnected {
-		disconnectErr := err
-		if disconnectErr == nil {
-			disconnectErr = closeErr
-		}
-		s.publish(Event{Kind: EventDisconnected, Device: dev, Source: source, Trigger: trigger, Error: disconnectErr})
-	}
-	return dev, closeErr
+	return wasConnected, dev, closeErr
 }
 
 func (s *Session) SendCommand(cmd uint16, meta Meta) error {
@@ -513,7 +541,7 @@ func (s *Session) Send(pkt spp.Packet, meta Meta) error {
 		s.mu.Unlock()
 		s.publish(Event{Kind: EventError, Device: dev, Error: err, Source: meta.Source, Trigger: meta.Trigger})
 		if s.isCurrentTransport(transport) {
-			_, _ = s.finalizeDisconnect(transport, meta.Source, "write error", err)
+			_ = s.finalizeDisconnect(transport, meta.Source, "write error", err)
 		}
 		return err
 	}
@@ -544,39 +572,55 @@ func (s *Session) FeaturePacket(fields []string) (spp.Packet, []string, error) {
 }
 
 func (s *Session) StartBatteryPolling(ctx context.Context, every time.Duration) {
+	every = normalizeBatteryPollInterval(every)
 	if every <= 0 {
 		return
 	}
-	if every < 30*time.Second {
-		every = 30 * time.Second
-	}
-	s.mu.Lock()
-	if s.batteryPolling {
-		s.mu.Unlock()
+	if !s.tryStartBatteryPolling() {
 		return
 	}
+	go s.runBatteryPollLoop(ctx, every)
+}
+
+func normalizeBatteryPollInterval(every time.Duration) time.Duration {
+	if every <= 0 {
+		return 0
+	}
+	if every < 30*time.Second {
+		return 30 * time.Second
+	}
+	return every
+}
+
+func (s *Session) tryStartBatteryPolling() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.batteryPolling {
+		return false
+	}
 	s.batteryPolling = true
-	s.mu.Unlock()
-	go func() {
-		defer func() {
-			s.mu.Lock()
-			s.batteryPolling = false
-			s.mu.Unlock()
-		}()
-		ticker := time.NewTicker(every)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if !shouldSendBatteryPoll(s.Snapshot()) {
-					continue
-				}
-				_ = s.SendCommand(spp.CmdGetBattery, Meta{Source: "auto_poll", Trigger: "battery refresh"})
-			}
-		}
+	return true
+}
+
+func (s *Session) runBatteryPollLoop(ctx context.Context, every time.Duration) {
+	defer func() {
+		s.mu.Lock()
+		s.batteryPolling = false
+		s.mu.Unlock()
 	}()
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if !shouldSendBatteryPoll(s.Snapshot()) {
+				continue
+			}
+			_ = s.SendCommand(spp.CmdGetBattery, Meta{Source: "auto_poll", Trigger: "battery refresh"})
+		}
+	}
 }
 
 func shouldSendBatteryPoll(snap Snapshot) bool {
@@ -615,11 +659,11 @@ func (s *Session) readLoop(transport bt.Transport) {
 			if !s.isCurrentTransport(transport) {
 				return
 			}
-			if err == io.EOF {
-				_, _ = s.finalizeDisconnect(transport, "read_loop", "RFCOMM closed", err)
+			if errors.Is(err, io.EOF) {
+				_ = s.finalizeDisconnect(transport, "read_loop", "RFCOMM closed", err)
 				return
 			}
-			_, _ = s.finalizeDisconnect(transport, "read_loop", "read error", err)
+			_ = s.finalizeDisconnect(transport, "read_loop", "read error", err)
 			return
 		}
 		s.handleRaw(raw)
@@ -640,15 +684,7 @@ func (s *Session) handleRaw(raw []byte) {
 	s.mu.Unlock()
 	pkt, err := spp.DecodePacket(raw)
 	if err != nil {
-		related := ""
-		if lastTX != nil && lastTX.Command != "" {
-			related = lastTX.Command
-		}
-		var tr trace.Event
-		if s.logger != nil {
-			tr = s.logger.LogRX(raw, spp.Packet{}, spp.ParsedPacket{}, err, s.traceContext(Meta{Source: "device"}, dev, model, related))
-		}
-		s.publish(Event{Kind: EventError, Device: dev, Raw: raw, Trace: tr, Error: err})
+		s.publishDecodeError(raw, dev, model, lastTX, err)
 		return
 	}
 	related := s.matchRequest(pkt)
@@ -667,42 +703,79 @@ func (s *Session) handleRaw(raw []byte) {
 		s.publish(Event{Kind: EventModel, Device: dev, Trace: *modelEvent, Source: "model", Trigger: modelEvent.Trigger})
 	}
 	s.recordConfig(parsed)
-	if parsed.DualList != nil {
-		s.mu.Lock()
-		s.dualList = append([]spp.DualDevice(nil), parsed.DualList.Devices...)
-		s.mu.Unlock()
-	}
-	if parsed.Kind == "dual_response" && len(pkt.Payload) > 0 && pkt.Payload[0] == 1 {
-		go func() {
-			time.Sleep(200 * time.Millisecond)
-			_ = s.SendCommand(spp.CmdGetSupportedFeature, Meta{Source: "dual", Trigger: "dual supported feature"})
-		}()
-	}
-	if parsed.Kind == "supported_features" && spp.SupportedFeatureDualList(pkt.Payload) {
-		go func() {
-			time.Sleep(200 * time.Millisecond)
-			_ = s.Send(spp.Packet{Cmd: spp.CmdGetDualDeviceList, Payload: []byte{0}}, Meta{Source: "dual", Trigger: "dual device list"})
-		}()
-	}
-	if parsed.Kind == "dual_connect_changed" {
-		go func() {
-			time.Sleep(200 * time.Millisecond)
-			_ = s.Send(spp.Packet{Cmd: spp.CmdGetDualDeviceList, Payload: []byte{0}}, Meta{Source: "dual", Trigger: "dual device list refresh"})
-		}()
-	}
+	s.updateDualList(parsed)
+	s.scheduleDualFollowups(parsed, pkt)
+	kind, parsed := s.mergeBatteryState(parsed)
 	var tr trace.Event
 	if s.logger != nil {
 		tr = s.logger.LogRX(raw, pkt, parsed, nil, s.traceContext(Meta{Source: "device"}, dev, model, related))
 	}
-	kind := EventPacketRX
-	if len(parsed.Batteries) > 0 {
-		kind = EventBattery
-		s.mu.Lock()
-		s.batteries = mergeBatteries(s.batteries, parsed.Batteries)
-		parsed.Batteries = cloneBatteries(s.batteries)
-		s.mu.Unlock()
-	}
 	s.publish(Event{Kind: kind, Device: dev, Raw: raw, Packet: pkt, Parsed: parsed, Trace: tr, Source: "device"})
+}
+
+func (s *Session) publishDecodeError(raw []byte, dev bt.Device, model spp.ModelInfo, lastTX *trace.Event, err error) {
+	related := ""
+	if lastTX != nil && lastTX.Command != "" {
+		related = lastTX.Command
+	}
+	var tr trace.Event
+	if s.logger != nil {
+		tr = s.logger.LogRX(raw, spp.Packet{}, spp.ParsedPacket{}, err, s.traceContext(Meta{Source: "device"}, dev, model, related))
+	}
+	s.publish(Event{Kind: EventError, Device: dev, Raw: raw, Trace: tr, Error: err})
+}
+
+func (s *Session) updateDualList(parsed spp.ParsedPacket) {
+	if parsed.DualList == nil {
+		return
+	}
+	s.mu.Lock()
+	s.dualList = append([]spp.DualDevice(nil), parsed.DualList.Devices...)
+	s.mu.Unlock()
+}
+
+func (s *Session) scheduleDualFollowups(parsed spp.ParsedPacket, pkt spp.Packet) {
+	s.scheduleDualFeatureProbe(parsed, pkt)
+	s.scheduleDualListFetch(parsed, pkt)
+	s.scheduleDualListRefresh(parsed)
+}
+
+func (s *Session) scheduleDualFeatureProbe(parsed spp.ParsedPacket, pkt spp.Packet) {
+	if parsed.Kind != "dual_response" || len(pkt.Payload) == 0 || pkt.Payload[0] != 1 {
+		return
+	}
+	s.afterDelay(200*time.Millisecond, func() {
+		_ = s.SendCommand(spp.CmdGetSupportedFeature, Meta{Source: "dual", Trigger: "dual supported feature"})
+	})
+}
+
+func (s *Session) scheduleDualListFetch(parsed spp.ParsedPacket, pkt spp.Packet) {
+	if parsed.Kind != "supported_features" || !spp.SupportedFeatureDualList(pkt.Payload) {
+		return
+	}
+	s.afterDelay(200*time.Millisecond, func() {
+		_ = s.Send(spp.Packet{Cmd: spp.CmdGetDualDeviceList, Payload: []byte{0}}, Meta{Source: "dual", Trigger: "dual device list"})
+	})
+}
+
+func (s *Session) scheduleDualListRefresh(parsed spp.ParsedPacket) {
+	if parsed.Kind != "dual_connect_changed" {
+		return
+	}
+	s.afterDelay(200*time.Millisecond, func() {
+		_ = s.Send(spp.Packet{Cmd: spp.CmdGetDualDeviceList, Payload: []byte{0}}, Meta{Source: "dual", Trigger: "dual device list refresh"})
+	})
+}
+
+func (s *Session) mergeBatteryState(parsed spp.ParsedPacket) (EventKind, spp.ParsedPacket) {
+	if len(parsed.Batteries) == 0 {
+		return EventPacketRX, parsed
+	}
+	s.mu.Lock()
+	s.batteries = mergeBatteries(s.batteries, parsed.Batteries)
+	parsed.Batteries = cloneBatteries(s.batteries)
+	s.mu.Unlock()
+	return EventBattery, parsed
 }
 
 func (s *Session) traceContext(meta Meta, dev bt.Device, model spp.ModelInfo, related string) trace.Context {

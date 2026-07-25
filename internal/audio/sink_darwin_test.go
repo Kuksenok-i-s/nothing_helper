@@ -2,10 +2,13 @@
 
 package audio
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestIsDefaultOutputForMACDarwinSkipsGate(t *testing.T) {
-	ok, err := IsDefaultOutputForMAC("aa:bb:cc:dd:ee:ff")
+	ok, err := IsDefaultOutputForMAC(context.Background(), "aa:bb:cc:dd:ee:ff")
 	if err != nil {
 		t.Fatal(err)
 	}

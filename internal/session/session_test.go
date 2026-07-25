@@ -302,6 +302,29 @@ func TestHandleRawMergesPartialBatteryEvents(t *testing.T) {
 	}
 }
 
+func TestHandleRawDecodeError(t *testing.T) {
+	s := New(nil, false, false)
+	events := s.Subscribe()
+	s.handleRaw([]byte{0x00})
+	select {
+	case ev := <-events:
+		if ev.Kind != EventError || ev.Error == nil {
+			t.Fatalf("event=%+v", ev)
+		}
+	default:
+		t.Fatal("expected decode error event")
+	}
+}
+
+func TestHandleRawRecordsConfig(t *testing.T) {
+	s := New(nil, false, false)
+	raw := spp.BuildFrame(spp.ControlCRC|spp.ControlMultiFrame, spp.CmdRspANC, 1, []byte{0x01, 0x01, 0x00, 0x02, 0x01, 0x00})
+	s.handleRaw(raw)
+	if got := s.Snapshot().Config["anc"]; got == "" {
+		t.Fatalf("config=%v", s.Snapshot().Config)
+	}
+}
+
 func TestMergeBatteriesDropsStaleStereoWhenCaseUpdated(t *testing.T) {
 	current := map[string]spp.Battery{
 		"stereo": {Percent: 80},
@@ -470,8 +493,9 @@ func TestPublishPriorityDoesNotBlockWhenSubscriberFull(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
+		defer close(done)
+		<-time.After(0)
 		s.publish(Event{Kind: EventBattery, Parsed: spp.ParsedPacket{Summary: "battery"}})
-		close(done)
 	}()
 
 	select {

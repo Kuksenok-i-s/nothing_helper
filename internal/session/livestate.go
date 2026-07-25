@@ -48,31 +48,41 @@ func cloneBatteries(src map[string]spp.Battery) map[string]spp.Battery {
 // recordConfig stores the latest decoded device configuration (ANC, low
 // latency, dual, EQ, spatial) so the UI can render it after auto-discovery.
 func (s *Session) recordConfig(parsed spp.ParsedPacket) {
-	var key string
-	switch parsed.Kind {
-	case "anc_response", "anc_changed":
-		key = "anc"
-	case "lag_response", "lag_changed":
-		key = "lag"
-	case "eq_response":
-		key = "eq"
-	case "spatial_response":
-		key = "spatial"
-	case "dual_response", "dual_switch_changed":
-		key = "dual"
-	default:
+	key, ok := configKeyForParsedKind(parsed.Kind)
+	if !ok {
 		return
 	}
-	value := parsed.Summary
-	if _, rest, ok := strings.Cut(parsed.Summary, ": "); ok {
-		value = rest
-	}
+	value := configValueFromSummary(parsed.Summary)
 	if value == "" {
 		return
 	}
 	s.mu.Lock()
 	s.config[key] = value
 	s.mu.Unlock()
+}
+
+func configKeyForParsedKind(kind string) (string, bool) {
+	switch kind {
+	case "anc_response", "anc_changed":
+		return "anc", true
+	case "lag_response", "lag_changed":
+		return "lag", true
+	case "eq_response":
+		return "eq", true
+	case "spatial_response":
+		return "spatial", true
+	case "dual_response", "dual_switch_changed":
+		return "dual", true
+	default:
+		return "", false
+	}
+}
+
+func configValueFromSummary(summary string) string {
+	if _, rest, ok := strings.Cut(summary, ": "); ok {
+		return rest
+	}
+	return summary
 }
 
 // matchRequest pairs an incoming response with the originating request by the

@@ -4,8 +4,8 @@ package notify
 
 import "testing"
 
-// The test binary is not an app bundle, so New must fall back to osascript and
-// still report itself as available.
+// TestNewUsesOsascriptBackend checks that without an app bundle, New falls
+// back to osascript and still reports itself as available.
 func TestNewUsesOsascriptBackend(t *testing.T) {
 	n := New("tws_manager", "")
 	if n.backend != "osascript" {
@@ -16,8 +16,8 @@ func TestNewUsesOsascriptBackend(t *testing.T) {
 	}
 }
 
-// sendNative dispatches delivery onto the main queue and returns immediately; it
-// must marshal C strings safely and never panic regardless of run-loop state.
+// TestSendNativeDoesNotPanic checks that sendNative marshals C strings safely
+// and never panics regardless of run-loop state.
 func TestSendNativeDoesNotPanic(t *testing.T) {
 	n := &Notifier{app: "Nothing Ear", icon: "audio-headphones"}
 	if got := n.sendNative(0, UrgencyCritical, "Battery low", "Left earbud at 5%", ""); got != 0 {

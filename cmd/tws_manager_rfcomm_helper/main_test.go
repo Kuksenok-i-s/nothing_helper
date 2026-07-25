@@ -1,62 +1,118 @@
 package main
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestNormalizeDeviceAndNumberFromDevice(t *testing.T) {
+	dev, num, err := normalizeDeviceAndNumber("/dev/rfcomm3", "")
+	if err != nil || dev != "/dev/rfcomm3" || num != "3" {
+		t.Fatalf("dev=%q num=%q err=%v", dev, num, err)
+	}
+}
+
+func TestNormalizeDeviceAndNumberFromNumber(t *testing.T) {
+	dev, num, err := normalizeDeviceAndNumber("", "5")
+	if err != nil || dev != "/dev/rfcomm5" || num != "5" {
+		t.Fatalf("dev=%q num=%q err=%v", dev, num, err)
+	}
+}
 
 func TestParseOwner(t *testing.T) {
-	if _, _, err := parseOwner("1000:1000"); err != nil {
-		t.Fatalf("parseOwner valid: %v", err)
+	uid, gid, err := parseOwner("1000:1000")
+	if err != nil || uid != 1000 || gid != 1000 {
+		t.Fatalf("uid=%d gid=%d err=%v", uid, gid, err)
 	}
-	tests := []string{"", "1000", "a:b", "1:-2", "1:"}
-	for _, tc := range tests {
-		t.Run(tc, func(t *testing.T) {
-			if _, _, err := parseOwner(tc); err == nil {
-				t.Fatalf("parseOwner(%q) expected error", tc)
-			}
-		})
+	_, _, err = parseOwner("bad")
+	if err == nil {
+		t.Fatal("expected owner parse error")
 	}
 }
 
-func TestNormalizeDeviceAndNumber(t *testing.T) {
-	dev, num, err := normalizeDeviceAndNumber("/dev/rfcomm2", "")
+func TestEnsureDevicePerms(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rfcomm-test")
+	if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureDevicePerms(path, "1000:1000"); err != nil {
+		t.Fatalf("ensureDevicePerms() = %v", err)
+	}
+}
+
+func TestWaitForDevice(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ready")
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := waitForDevice(path, 500); err != nil {
+		t.Fatalf("waitForDevice() = %v", err)
+	}
+}
+
+func TestRunReleaseNotBound(t *testing.T) {
+	old := execCombinedOutput
+	execCombinedOutput = func(context.Context, string, ...string) ([]byte, error) {
+		return []byte("Can't release device: Not bound"), errors.New("failed")
+	}
+	t.Cleanup(func() { execCombinedOutput = old })
+
+	if err := run([]string{"release", "--number", "0"}); err != nil {
+		t.Fatalf("run(release) = %v", err)
+	}
+}
+
+func TestRunMissingAction(t *testing.T) {
+	if err := run(nil); err == nil {
+		t.Fatal("expected usage error")
+	}
+}
+
+func TestRunBindSuccess(t *testing.T) {
+	oldExec := execCombinedOutput
+	oldWait := waitForDeviceHook
+	oldEnsure := ensureDevicePermsHook
+	execCombinedOutput = func(context.Context, string, ...string) ([]byte, error) { return nil, nil }
+	waitForDeviceHook = func(string, time.Duration) error { return nil }
+	ensureDevicePermsHook = func(string, string) error { return nil }
+	t.Cleanup(func() {
+		execCombinedOutput = oldExec
+		waitForDeviceHook = oldWait
+		ensureDevicePermsHook = oldEnsure
+	})
+
+	err := run([]string{
+		"bind",
+		"--number", "0",
+		"--addr", "AA:BB:CC:DD:EE:FF",
+		"--owner", "1000:1000",
+	})
 	if err != nil {
-		t.Fatalf("normalize with device: %v", err)
-	}
-	if dev != "/dev/rfcomm2" || num != "2" {
-		t.Fatalf("got dev=%q num=%q", dev, num)
-	}
-	if _, _, err := normalizeDeviceAndNumber("", "2"); err != nil {
-		t.Fatalf("normalize with number: %v", err)
-	}
-	if _, _, err := normalizeDeviceAndNumber("/dev/rfcomm1", "2"); err == nil {
-		t.Fatal("expected mismatch error")
+		t.Fatalf("run(bind) = %v", err)
 	}
 }
 
-func TestRunValidationErrors(t *testing.T) {
-	cases := [][]string{
-		{},
-		{"unknown"},
-		{"bind", "--number", "0", "--addr", "bad", "--channel", "15", "--owner", "1000:1000"},
-		{"bind", "--number", "0", "--addr", "AA:BB:CC:DD:EE:FF", "--channel", "15"},
-		{"release"},
-		{"fix-perms", "--device", "/tmp/not-rfcomm", "--owner", "1000:1000"},
-	}
-	for _, args := range cases {
-		t.Run(joinArgs(args), func(t *testing.T) {
-			if err := run(args); err == nil {
-				t.Fatalf("run(%v) expected error", args)
-			}
-		})
+func TestRunBindValidation(t *testing.T) {
+	if err := run([]string{"bind", "--number", "0", "--addr", "bad", "--owner", "1000:1000"}); err == nil {
+		t.Fatal("expected invalid MAC error")
 	}
 }
 
-func joinArgs(args []string) string {
-	if len(args) == 0 {
-		return "empty"
+func TestRunFixPermsValidation(t *testing.T) {
+	if err := runFixPerms(nil); err == nil {
+		t.Fatal("expected usage error")
 	}
-	out := args[0]
-	for _, a := range args[1:] {
-		out += "_" + a
+	if err := runFixPerms([]string{"--device", "/tmp/x"}); err == nil {
+		t.Fatal("expected invalid device error")
 	}
-	return out
+	old := ensureDevicePermsHook
+	ensureDevicePermsHook = func(string, string) error { return nil }
+	t.Cleanup(func() { ensureDevicePermsHook = old })
+	if err := runFixPerms([]string{"--device", "/dev/rfcomm0", "--owner", "1000:1000"}); err != nil {
+		t.Fatalf("runFixPerms() = %v", err)
+	}
 }

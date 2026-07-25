@@ -9,6 +9,7 @@ package notify
 */
 import "C"
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"unsafe"
@@ -58,7 +59,7 @@ func (n *Notifier) sendOsascript(replaces uint32, urgency Urgency, title, body, 
 	_ = icon
 	script := fmt.Sprintf(`display notification %q with title %q subtitle %q`,
 		body, n.app, title)
-	if err := exec.Command("osascript", "-e", script).Run(); err != nil {
+	if err := exec.CommandContext(context.Background(), "osascript", "-e", script).Run(); err != nil {
 		Warnf("osascript failed (%s): %v", title, err)
 	}
 	return 0

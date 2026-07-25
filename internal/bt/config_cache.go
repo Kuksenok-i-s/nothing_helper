@@ -34,10 +34,3 @@ func invalidateConfigCache(path string) {
 	delete(configCache, path)
 	delete(configLoadErr, path)
 }
-
-func invalidateAllConfigCache() {
-	configCacheMu.Lock()
-	defer configCacheMu.Unlock()
-	configCache = map[string]Config{}
-	configLoadErr = map[string]error{}
-}

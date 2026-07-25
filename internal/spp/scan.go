@@ -47,4 +47,3 @@ func ParseScanCommand(fields []string) (uint16, uint16, time.Duration, error) {
 func SafeScanCommand(cmd uint16) bool {
 	return cmd&0xF000 == 0xC000
 }
-

@@ -74,3 +74,30 @@ func TestPromptText(t *testing.T) {
 		t.Fatalf("text=%q", got)
 	}
 }
+
+func TestHostOwnerStatus(t *testing.T) {
+	host := "AA:BB:CC:DD:EE:FF"
+	if got := HostOwnerStatus(nil, host); got != "" {
+		t.Fatalf("empty list = %q", got)
+	}
+	devs := []spp.DualDevice{
+		{MAC: "11:22:33:44:55:66", Connected: true, Owner: true},
+	}
+	if got := HostOwnerStatus(devs, host); got != "" {
+		t.Fatalf("phone owner = %q", got)
+	}
+	devs = []spp.DualDevice{
+		{MAC: host, Name: "Workstation", Connected: true, Owner: true},
+	}
+	got := HostOwnerStatus(devs, host)
+	if !strings.Contains(got, "Workstation") {
+		t.Fatalf("named host = %q", got)
+	}
+	devs = []spp.DualDevice{
+		{MAC: host, Connected: true, Owner: true},
+	}
+	got = HostOwnerStatus(devs, host)
+	if !strings.Contains(got, "PC") {
+		t.Fatalf("unnamed host = %q", got)
+	}
+}

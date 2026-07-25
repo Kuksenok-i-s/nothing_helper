@@ -86,7 +86,12 @@ func privilegedRFCOMMRelease(num string) error {
 	)
 }
 
+var privilegedEnsureRFCOMMAccessHook func(string, string) error
+
 func privilegedEnsureRFCOMMAccess(device, owner string) error {
+	if privilegedEnsureRFCOMMAccessHook != nil {
+		return privilegedEnsureRFCOMMAccessHook(device, owner)
+	}
 	return withPrivilegeFallback(
 		func() error { return polkitFixPerms(device, owner) },
 		func() error {
@@ -107,15 +112,19 @@ func withPrivilegeFallback(polkitFn, sudoFn func() error) error {
 	case PrivilegeModeSudo:
 		return sudoFn()
 	case PrivilegeModeAuto:
-		if err := polkitFn(); err != nil {
-			if sudoErr := sudoFn(); sudoErr != nil {
-				return fmt.Errorf("polkit failed: %w; sudo fallback failed: %w", err, sudoErr)
-			}
-		}
-		return nil
+		return privilegeAutoFallback(polkitFn, sudoFn)
 	default:
 		return sudoFn()
 	}
+}
+
+func privilegeAutoFallback(polkitFn, sudoFn func() error) error {
+	if err := polkitFn(); err != nil {
+		if sudoErr := sudoFn(); sudoErr != nil {
+			return fmt.Errorf("polkit failed: %w; sudo fallback failed: %w", err, sudoErr)
+		}
+	}
+	return nil
 }
 
 func polkitBind(num, mac string, channel int) error {

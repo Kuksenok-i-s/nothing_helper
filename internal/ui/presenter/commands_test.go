@@ -135,6 +135,27 @@ func TestBuildCommandsIncludesScanOnlyWithUnsafe(t *testing.T) {
 	t.Fatal("raw scan missing with unsafe enabled")
 }
 
+func TestBuildCommandsDualDevices(t *testing.T) {
+	model := spp.DefaultModel()
+	devs := []spp.DualDevice{
+		{MAC: "AA:BB:CC:DD:EE:01", Name: "Phone", Connected: false},
+		{MAC: "AA:BB:CC:DD:EE:02", Connected: true},
+	}
+	cmds := BuildCommands(model, devs, false)
+	var connect, disconnect bool
+	for _, c := range cmds {
+		if len(c.Fields) == 3 && c.Fields[0] == "dual" && c.Fields[1] == "connect" {
+			connect = true
+		}
+		if len(c.Fields) == 3 && c.Fields[0] == "dual" && c.Fields[1] == "disconnect" {
+			disconnect = true
+		}
+	}
+	if !connect || !disconnect {
+		t.Fatalf("connect=%v disconnect=%v", connect, disconnect)
+	}
+}
+
 func TestCommandClassification(t *testing.T) {
 	get := Command{Title: "Info: battery", Cmd: spp.CmdGetBattery}
 	set := Command{Title: "SET: anc off", Fields: []string{"anc", "set", "off"}}

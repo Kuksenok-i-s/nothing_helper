@@ -3,22 +3,31 @@ package session
 import "tws_manager/internal/trace"
 
 func (s *Session) publish(event Event) {
-	if s.logger != nil && event.Trace.Direction == "" {
-		s.logger.LogEvent(trace.Event{
-			Direction:     string(event.Kind),
-			Source:        event.Source,
-			Trigger:       event.Trigger,
-			DeviceMAC:     event.Device.MAC,
-			DeviceName:    event.Device.Name,
-			ModelCodename: s.Snapshot().Model.Codename,
-			Summary:       eventSummary(event),
-			Error:         errorString(event.Error),
-		})
-	}
+	s.logPublishedEvent(event)
 	select {
 	case s.events <- event:
 	default:
 	}
+	s.dispatchToSubscribers(event)
+}
+
+func (s *Session) logPublishedEvent(event Event) {
+	if s.logger == nil || event.Trace.Direction != "" {
+		return
+	}
+	s.logger.LogEvent(trace.Event{
+		Direction:     string(event.Kind),
+		Source:        event.Source,
+		Trigger:       event.Trigger,
+		DeviceMAC:     event.Device.MAC,
+		DeviceName:    event.Device.Name,
+		ModelCodename: s.Snapshot().Model.Codename,
+		Summary:       eventSummary(event),
+		Error:         errorString(event.Error),
+	})
+}
+
+func (s *Session) dispatchToSubscribers(event Event) {
 	s.mu.Lock()
 	subscribers := append([]chan Event(nil), s.subscribers...)
 	s.mu.Unlock()

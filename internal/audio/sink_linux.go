@@ -3,6 +3,7 @@
 package audio
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -10,17 +11,21 @@ import (
 	"tws_manager/internal/security"
 )
 
+var (
+	execLookPath      = exec.LookPath
+	execCommandOutput = func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		return exec.CommandContext(ctx, name, args...).Output()
+	}
+)
+
 // IsDefaultOutputForMAC reports whether the system default playback sink
 // belongs to the Bluetooth device with the given MAC (bluez_output.XX_...).
-func IsDefaultOutputForMAC(mac string) (bool, error) {
+func IsDefaultOutputForMAC(ctx context.Context, mac string) (bool, error) {
 	prefix, err := sinkPrefixForMAC(mac)
 	if err != nil {
 		return false, err
 	}
-	sink, err := defaultPlaybackSink()
-	if err != nil {
-		return false, err
-	}
+	sink := defaultPlaybackSink(ctx)
 	if sink == "" {
 		return false, nil
 	}
@@ -35,32 +40,32 @@ func sinkPrefixForMAC(mac string) (string, error) {
 	return "bluez_output." + strings.ReplaceAll(norm, ":", "_"), nil
 }
 
-func defaultPlaybackSink() (string, error) {
-	if sink, err := pactlDefaultSink(); err == nil && sink != "" {
-		return sink, nil
+func defaultPlaybackSink(ctx context.Context) string {
+	if sink, err := pactlDefaultSink(ctx); err == nil && sink != "" {
+		return sink
 	}
-	if sink, err := wpctlDefaultSink(); err == nil && sink != "" {
-		return sink, nil
+	if sink, err := wpctlDefaultSink(ctx); err == nil && sink != "" {
+		return sink
 	}
-	return "", nil
+	return ""
 }
 
-func pactlDefaultSink() (string, error) {
-	if _, err := exec.LookPath("pactl"); err != nil {
+func pactlDefaultSink(ctx context.Context) (string, error) {
+	if _, err := execLookPath("pactl"); err != nil {
 		return "", err
 	}
-	out, err := exec.Command("pactl", "get-default-sink").Output()
+	out, err := execCommandOutput(ctx, "pactl", "get-default-sink")
 	if err != nil {
 		return "", fmt.Errorf("pactl get-default-sink: %w", err)
 	}
 	return strings.TrimSpace(string(out)), nil
 }
 
-func wpctlDefaultSink() (string, error) {
-	if _, err := exec.LookPath("wpctl"); err != nil {
+func wpctlDefaultSink(ctx context.Context) (string, error) {
+	if _, err := execLookPath("wpctl"); err != nil {
 		return "", err
 	}
-	out, err := exec.Command("wpctl", "inspect", "@DEFAULT_AUDIO_SINK@").Output()
+	out, err := execCommandOutput(ctx, "wpctl", "inspect", "@DEFAULT_AUDIO_SINK@")
 	if err != nil {
 		return "", fmt.Errorf("wpctl inspect @DEFAULT_AUDIO_SINK@: %w", err)
 	}

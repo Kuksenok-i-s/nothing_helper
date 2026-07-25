@@ -3,12 +3,25 @@
 package notify
 
 import (
+	"context"
 	"os/exec"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 var gdbusID = regexp.MustCompile(`uint32 (\d+)`)
+
+const notifyTimeout = 5 * time.Second
+
+var (
+	execCommandOutput = func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		return exec.CommandContext(ctx, name, args...).Output()
+	}
+	execCommandRun = func(ctx context.Context, name string, args ...string) error {
+		return exec.CommandContext(ctx, name, args...).Run()
+	}
+)
 
 // New returns a Notifier for appName using gdbus or notify-send.
 func New(appName, icon string) *Notifier {
@@ -19,6 +32,11 @@ func New(appName, icon string) *Notifier {
 		icon = "audio-headphones"
 	}
 	n := &Notifier{app: appName, icon: icon}
+	configureNotifyBackend(n)
+	return n
+}
+
+func configureNotifyBackend(n *Notifier) {
 	switch {
 	case have("gdbus"):
 		n.backend = "gdbus"
@@ -29,12 +47,13 @@ func New(appName, icon string) *Notifier {
 	default:
 		n.send = func(uint32, Urgency, string, string, string) uint32 { return 0 }
 	}
-	return n
 }
 
 func (n *Notifier) sendGdbus(replaces uint32, urgency Urgency, title, body, icon string) uint32 {
 	hints := "@a{sv} {'urgency': <byte " + strconv.Itoa(int(urgency)) + ">}"
-	cmd := exec.Command("gdbus", "call", "--session",
+	ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
+	defer cancel()
+	out, err := execCommandOutput(ctx, "gdbus", "call", "--session",
 		"--dest", "org.freedesktop.Notifications",
 		"--object-path", "/org/freedesktop/Notifications",
 		"--method", "org.freedesktop.Notifications.Notify",
@@ -44,7 +63,6 @@ func (n *Notifier) sendGdbus(replaces uint32, urgency Urgency, title, body, icon
 		"@as []", hints,
 		"5000",
 	)
-	out, err := cmd.Output()
 	if err != nil {
 		Warnf("gdbus Notify failed (%s): %v", title, err)
 		if replaces == 0 && have("notify-send") {
@@ -69,7 +87,9 @@ func (n *Notifier) sendNotifySendDirect(urgency Urgency, title, body, icon strin
 	args := []string{"-a", n.app, "-i", icon, "-u", urgencyName(urgency)}
 	args = append(args, "-h", "string:x-canonical-private-synchronous:tws_manager")
 	args = append(args, title, body)
-	if err := exec.Command("notify-send", args...).Run(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
+	defer cancel()
+	if err := execCommandRun(ctx, "notify-send", args...); err != nil {
 		Warnf("notify-send failed (%s): %v", title, err)
 	}
 	return 0

@@ -106,24 +106,14 @@ func sortLevels(levels []lowLevel) {
 
 func checkLowBattery(n *Notifier, data map[string]spp.Battery, earbudLevels, caseLevels []lowLevel, fired map[string]int) {
 	for _, comp := range orderedComponents(data) {
-		levels := earbudLevels
-		if comp == "case" {
-			levels = caseLevels
-		}
+		levels := lowLevelsForComponent(comp, earbudLevels, caseLevels)
 		b := data[comp]
 		if b.Charging {
 			delete(fired, comp)
 			continue
 		}
-		var hit *lowLevel
-		for i := range levels {
-			if b.Percent <= levels[i].percent {
-				hit = &levels[i]
-			}
-		}
+		hit := findLowLevelHit(b.Percent, levels)
 		if hit == nil {
-			// Require recovery above the last fired threshold before alerting again
-			// (avoids repeat alerts when percent oscillates around a threshold).
 			if prev, ok := fired[comp]; ok && b.Percent > prev+5 {
 				delete(fired, comp)
 			}
@@ -136,6 +126,23 @@ func checkLowBattery(n *Notifier, data map[string]spp.Battery, earbudLevels, cas
 		n.Alert(hit.urgency, hit.title,
 			fmt.Sprintf(hit.bodyFmt, componentLabel(comp), b.Percent))
 	}
+}
+
+func lowLevelsForComponent(comp string, earbudLevels, caseLevels []lowLevel) []lowLevel {
+	if comp == "case" {
+		return caseLevels
+	}
+	return earbudLevels
+}
+
+func findLowLevelHit(percent int, levels []lowLevel) *lowLevel {
+	var hit *lowLevel
+	for i := range levels {
+		if percent <= levels[i].percent {
+			hit = &levels[i]
+		}
+	}
+	return hit
 }
 
 func deviceName(sv sessionView, fallback string) string {
@@ -174,25 +181,22 @@ func orderedComponents(data map[string]spp.Battery) []string {
 }
 
 func componentLabel(comp string) string {
-	switch comp {
-	case "left":
-		return "Left earbud"
-	case "right":
-		return "Right earbud"
-	case "case":
-		return "Case"
-	case "stereo":
-		return "Headphones"
-	case "tws":
-		return "Earbuds"
-	case "watch":
-		return "Watch"
-	default:
-		if strings.HasPrefix(comp, "id_") {
-			return "Device " + strings.TrimPrefix(comp, "id_")
-		}
-		return comp
+	if label, ok := knownComponentLabels[comp]; ok {
+		return label
 	}
+	return defaultComponentLabel(comp)
+}
+
+var knownComponentLabels = map[string]string{
+	"left": "Left earbud", "right": "Right earbud", "case": "Case",
+	"stereo": "Headphones", "tws": "Earbuds", "watch": "Watch",
+}
+
+func defaultComponentLabel(comp string) string {
+	if strings.HasPrefix(comp, "id_") {
+		return "Device " + strings.TrimPrefix(comp, "id_")
+	}
+	return comp
 }
 
 func formatBatteries(data map[string]spp.Battery) string {

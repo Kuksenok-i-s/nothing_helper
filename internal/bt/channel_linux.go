@@ -36,22 +36,23 @@ func channelCandidates(preferred int) []int {
 	return out
 }
 
-func shouldProbeNextChannel(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, ErrRFCOMMPermission) ||
-		errors.Is(err, ErrInvalidBluetoothMAC) {
-		return false
-	}
-	if isRecoverableRFCOMMOpenError(err) {
-		return true
-	}
-	if errors.Is(err, ErrRFCOMMBindFailed) ||
+func isProbeStopError(err error) bool {
+	return errors.Is(err, ErrRFCOMMPermission) || errors.Is(err, ErrInvalidBluetoothMAC)
+}
+
+func isProbeRetryError(err error) bool {
+	return errors.Is(err, ErrRFCOMMBindFailed) ||
 		errors.Is(err, ErrRFCOMMWaitFailed) ||
 		errors.Is(err, ErrRFCOMMOpenFailed) ||
 		errors.Is(err, ErrRFCOMMReviveFailed) ||
-		errors.Is(err, ErrRFCOMMNoChannel) {
+		errors.Is(err, ErrRFCOMMNoChannel)
+}
+
+func shouldProbeNextChannel(err error) bool {
+	if err == nil || isProbeStopError(err) {
+		return false
+	}
+	if isRecoverableRFCOMMOpenError(err) || isProbeRetryError(err) {
 		return true
 	}
 	return false

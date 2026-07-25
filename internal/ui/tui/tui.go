@@ -47,7 +47,7 @@ type Model struct {
 	activeTab         int
 	commenting        bool
 	pendingUnsafeItem *presenter.Command
-	dualPrompt dualprompt.Controller
+	dualPrompt        dualprompt.Controller
 	styles            styles
 }
 
@@ -69,8 +69,8 @@ type commandItem struct {
 }
 
 func (i commandItem) Title() string       { return i.Command.Title }
-func (i commandItem) Description() string { return i.Command.Desc }
-func (i commandItem) FilterValue() string { return i.Command.Title + " " + i.Command.Desc }
+func (i commandItem) Description() string { return i.Desc }
+func (i commandItem) FilterValue() string { return i.Command.Title + " " + i.Desc }
 
 func commandListItems(model spp.ModelInfo, dualDevices []spp.DualDevice, allowUnsafe bool) []list.Item {
 	cmds := presenter.BuildCommands(model, dualDevices, allowUnsafe)
@@ -92,16 +92,16 @@ func New(s *session.Session, opts Options) Model {
 	p.AutoReconnect = opts.AutoDiscover
 	p.Status = "discovering devices..."
 	return Model{
-		session:   s,
-		manager:   opts.Manager,
-		events:    s.Subscribe(),
-		options:   opts,
-		presenter: p,
-		commands:  commands,
-		log:       viewport.New(80, 16),
-		comment:   comment,
-		styles:    defaultStyles(),
-		activeTab:     0,
+		session:    s,
+		manager:    opts.Manager,
+		events:     s.Subscribe(),
+		options:    opts,
+		presenter:  p,
+		commands:   commands,
+		log:        viewport.New(80, 16),
+		comment:    comment,
+		styles:     defaultStyles(),
+		activeTab:  0,
 		dualPrompt: dualprompt.Controller{Mode: opts.PCPrimary},
 	}
 }
@@ -126,113 +126,6 @@ func Run(ctx context.Context, s *session.Session, opts Options) error {
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(discoverCmd(m.manager), waitEventCmd(m.events))
-}
-
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.commenting {
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.String() {
-			case "enter":
-				m.commenting = false
-				return m, nil
-			case "esc":
-				m.commenting = false
-				m.comment.SetValue("")
-				return m, nil
-			}
-		}
-		var cmd tea.Cmd
-		m.comment, cmd = m.comment.Update(msg)
-		return m, cmd
-	}
-
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if !m.commenting {
-			m.markUserInteraction()
-			if m.dualPrompt.Visible {
-				switch msg.String() {
-				case "y", "Y":
-					m.acceptDualPCPrimary()
-					return m, waitEventCmd(m.events)
-				case "n", "N":
-					m.declineDualPCPrimary()
-					return m, waitEventCmd(m.events)
-				}
-			}
-		}
-		switch msg.String() {
-		case "ctrl+c":
-			_ = m.session.Close()
-			return m, tea.Quit
-		case "q":
-			_ = m.session.Close()
-			return m, tea.Quit
-		case "tab":
-			m.activeTab = (m.activeTab + 1) % 3
-		case "r":
-			m.presenter.Status = "refreshing discovery..."
-			return m, discoverCmd(m.manager)
-		case "c":
-			m.commenting = true
-			m.comment.Focus()
-		case "s":
-			return m, m.exportCmd()
-		case "enter":
-			if m.activeTab == 0 && len(m.devices) > 0 {
-				dev := m.devices[0]
-				m.presenter.Status = "connecting " + dev.Name
-				return m, connectCmd(m.manager, dev)
-			}
-			if m.activeTab == 1 {
-				if item, ok := m.commands.SelectedItem().(commandItem); ok {
-					if presenter.IsScanCommand(item.Command) {
-						if !m.options.AllowUnsafe {
-							m.presenter.Err = "scan requires --unsafe"
-							return m, nil
-						}
-						fields := strings.Fields(strings.TrimSpace(m.comment.Value()))
-						if len(fields) != 4 || !strings.EqualFold(fields[0], "scan") {
-							m.presenter.Err = "comment scan: scan c001 c020 500ms (GET 0xC0xx only, delay >= 200ms, max 32 cmds)"
-							m.presenter.Status = "Enter scan range in comment (c), then confirm with Enter"
-							return m, nil
-						}
-						if m.pendingUnsafeItem == nil || m.pendingUnsafeItem.Title != item.Command.Title {
-							m.pendingUnsafeItem = &item.Command
-							m.presenter.Status = fmt.Sprintf("Confirm scan %s %s %s: press Enter again", fields[1], fields[2], fields[3])
-							m.presenter.Err = ""
-							return m, nil
-						}
-						m.pendingUnsafeItem = nil
-						return m, runScanCmd(m.options.Ctx, m.session, fields)
-					}
-					// All catalog commands (GET and SET presets) are safe by
-					// construction; only the raw scan above needs gating.
-					return m, sendCommandCmd(m.session, item.Command, m.comment.Value())
-				}
-			}
-		}
-	case devicesMsg:
-		m.devices = []bt.Device(msg)
-		if len(m.devices) == 0 {
-			m.presenter.Status = "no compatible TWS devices found; pass --addr for manual connection"
-		} else {
-			m.presenter.Status = fmt.Sprintf("found %d candidate(s); Enter connects first", len(m.devices))
-		}
-	case eventMsg:
-		event := session.Event(msg)
-		m.applyEvent(event)
-		return m, waitEventCmd(m.events)
-	case errMsg:
-		m.presenter.Err = error(msg).Error()
-	}
-
-	var cmd tea.Cmd
-	if m.activeTab == 1 {
-		m.commands, cmd = m.commands.Update(msg)
-	}
-	return m, cmd
 }
 
 func (m Model) View() string {

@@ -14,26 +14,42 @@ func (r *Runtime) Shutdown(ctx context.Context) error {
 	}
 	var err error
 	r.shutdownOnce.Do(func() {
-		if ctx != nil {
-			select {
-			case <-ctx.Done():
-				err = ctx.Err()
-			default:
-			}
-		}
-		if r.Session != nil {
-			if closeErr := r.Session.Close(); closeErr != nil && err == nil {
-				err = closeErr
-			}
-		}
-		if r.Logger != nil {
-			if logErr := r.Logger.Close(); logErr != nil && err == nil {
-				err = logErr
-			}
-			r.Logger = nil
-		}
+		err = r.shutdownOnceBody(ctx)
 	})
 	return err
+}
+
+func (r *Runtime) shutdownOnceBody(ctx context.Context) error {
+	if ctx != nil {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+	}
+	var err error
+	if r.Session != nil {
+		if closeErr := r.Session.Close(); closeErr != nil {
+			err = closeErr
+		}
+	}
+	return firstError(err, r.closeBootstrapLogger())
+}
+
+func (r *Runtime) closeBootstrapLogger() error {
+	if r.Logger == nil {
+		return nil
+	}
+	err := r.Logger.Close()
+	r.Logger = nil
+	return err
+}
+
+func firstError(primary, secondary error) error {
+	if primary != nil {
+		return primary
+	}
+	return secondary
 }
 
 // Run bootstraps the runtime, invokes fn, and always shuts down on return or ctx cancel.
@@ -43,7 +59,9 @@ func Run(ctx context.Context, cfg Config, fn func(context.Context, *Runtime) err
 		return err
 	}
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// WithoutCancel keeps request-scoped values while allowing shutdown after
+	// the run context is cancelled.
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer shutdownCancel()
 
 	var once sync.Once

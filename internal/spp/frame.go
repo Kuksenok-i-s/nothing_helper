@@ -18,20 +18,32 @@ const (
 	DeviceTypeTWS     = 1 << 8
 	ControlTXDefault  = ControlCRC | ControlMultiFrame | DeviceTypeTWS // 0x0160
 
-	// Response command IDs (request & 0x7FFF).
-	CmdRspProtocolVersion  = 0x4001
-	CmdRspIdentity         = 0x4005
-	CmdRspRemoteConfig     = 0x4006
-	CmdRspBattery          = 0x4007
-	CmdRspStatus           = 0x400A
+	// CmdRspProtocolVersion is the response ID for protocol version (request & 0x7FFF).
+	CmdRspProtocolVersion = 0x4001
+	// CmdRspIdentity is the response ID for device identity.
+	CmdRspIdentity = 0x4005
+	// CmdRspRemoteConfig is the response ID for remote config.
+	CmdRspRemoteConfig = 0x4006
+	// CmdRspBattery is the response ID for battery status.
+	CmdRspBattery = 0x4007
+	// CmdRspStatus is the response ID for earphone status.
+	CmdRspStatus = 0x400A
+	// CmdRspSupportedFeature is the response ID for supported features.
 	CmdRspSupportedFeature = 0x400D
-	CmdRspANC              = 0x401E
-	CmdRspEQ               = 0x401F
-	CmdRspDualEnable       = 0x4027
-	CmdRspDualDeviceList   = 0x4028
-	CmdRspLag              = 0x4041
-	CmdRspFirmware         = 0x4042
-	CmdRspSpatial          = 0x404F
+	// CmdRspANC is the response ID for ANC mode.
+	CmdRspANC = 0x401E
+	// CmdRspEQ is the response ID for EQ mode.
+	CmdRspEQ = 0x401F
+	// CmdRspDualEnable is the response ID for dual-connection enable.
+	CmdRspDualEnable = 0x4027
+	// CmdRspDualDeviceList is the response ID for the dual-device list.
+	CmdRspDualDeviceList = 0x4028
+	// CmdRspLag is the response ID for latency/lag.
+	CmdRspLag = 0x4041
+	// CmdRspFirmware is the response ID for firmware version.
+	CmdRspFirmware = 0x4042
+	// CmdRspSpatial is the response ID for spatial audio.
+	CmdRspSpatial = 0x404F
 )
 
 type Packet struct {

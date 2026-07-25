@@ -47,15 +47,18 @@ func DecodePacket(raw []byte) (Packet, error) {
 	if length > 0 {
 		pkt.Payload = append([]byte(nil), raw[8:8+length]...)
 	}
-
-	if control&ControlCRC != 0 {
-		off := 8 + int(length)
-		pkt.CRC = getUint16LE(raw, off)
-		computed := CRC16(raw[:off])
-		pkt.CRCValid = computed == pkt.CRC
-	}
-
+	decodePacketCRC(&pkt, raw, control, length)
 	return pkt, nil
+}
+
+func decodePacketCRC(pkt *Packet, raw []byte, control uint16, length uint16) {
+	if control&ControlCRC == 0 {
+		return
+	}
+	off := 8 + int(length)
+	pkt.CRC = getUint16LE(raw, off)
+	computed := CRC16(raw[:off])
+	pkt.CRCValid = computed == pkt.CRC
 }
 
 func ParsePairs(payload []byte) map[string]Battery {
@@ -161,4 +164,3 @@ func NormalizeBatteryForModel(data map[string]Battery, model ModelInfo) (map[str
 
 	return out, warnings
 }
-

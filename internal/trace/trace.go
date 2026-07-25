@@ -124,9 +124,22 @@ func (l *Logger) LogEvent(event Event) {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	event = l.prepareLogEvent(event)
+	if err := l.encoder.Encode(event); err != nil {
+		fmt.Fprintf(os.Stderr, "trace log error: %v\n", err)
+	}
+}
+
+func (l *Logger) prepareLogEvent(event Event) Event {
 	if event.Time == "" {
 		event.Time = time.Now().Format(time.RFC3339Nano)
 	}
+	event = l.enrichEventCRCFields(event)
+	l.recordCRCSample(event)
+	return redactEvent(event, l.logRaw)
+}
+
+func (l *Logger) enrichEventCRCFields(event Event) Event {
 	if event.RawHex != "" && event.RawWithoutCRC == "" && event.CRC == "" {
 		if raw, err := hex.DecodeString(event.RawHex); err == nil {
 			rawWithoutCRC, crc := SplitCRC(raw)
@@ -134,13 +147,13 @@ func (l *Logger) LogEvent(event Event) {
 			event.CRC = hex.EncodeToString(crc)
 		}
 	}
+	return event
+}
+
+func (l *Logger) recordCRCSample(event Event) {
 	if l.logRaw && event.RawWithoutCRC != "" && event.CRC != "" {
 		key := event.RawWithoutCRC + ":" + event.CRC
 		l.samples[key] = CRCSample{RawWithoutCRC: event.RawWithoutCRC, CRC: event.CRC}
-	}
-	event = redactEvent(event, l.logRaw)
-	if err := l.encoder.Encode(event); err != nil {
-		fmt.Fprintf(os.Stderr, "trace log error: %v\n", err)
 	}
 }
 

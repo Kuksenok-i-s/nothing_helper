@@ -62,11 +62,11 @@ func (s *State) RunToggle(tf presenter.ToggleFeature, on bool) {
 		fields = tf.OnFields
 	}
 	s.MarkTogglePending(tf.Feature, on)
-	go func() {
+	s.goUI(func() {
 		s.RunCommand(presenter.Command{Title: tf.Label + " set", Fields: fields})
 		time.Sleep(350 * time.Millisecond)
 		s.RunCommand(presenter.Command{Title: tf.Label + " get", Fields: []string{tf.Feature, "get"}})
-	}()
+	})
 }
 
 // RunDualAction connects or disconnects a dual-connection peer device.
@@ -120,13 +120,13 @@ func (s *State) refreshFeatureAfterSet(fields []string) {
 	default:
 		return
 	}
-	go func() {
+	s.goUI(func() {
 		time.Sleep(350 * time.Millisecond)
 		s.RunCommand(presenter.Command{
 			Title:  feature + " get",
 			Fields: []string{feature, "get"},
 		})
-	}()
+	})
 }
 
 // resetOnDisconnectLocked clears feature toggles and rebuilds the command list

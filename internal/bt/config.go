@@ -6,7 +6,12 @@ import (
 	"path/filepath"
 )
 
+var configPathOverride func() string
+
 func ConfigPath() string {
+	if configPathOverride != nil {
+		return configPathOverride()
+	}
 	if dir, err := os.UserConfigDir(); err == nil {
 		return filepath.Join(dir, "tws_manager", "devices.json")
 	}
@@ -46,4 +51,18 @@ func SaveConfig(path string, cfg Config) error {
 	}
 	invalidateConfigCache(path)
 	return nil
+}
+
+// SetConfigPathHook overrides ConfigPath in tests. Pass nil to restore default.
+func SetConfigPathHook(fn func() string) {
+	configPathOverride = fn
+}
+
+// SetBluetoothInfoHook overrides Bluetooth lookups in tests. Pass nil to restore default.
+func SetBluetoothInfoHook(fn func(string) (string, error)) {
+	if fn == nil {
+		bluetoothInfoFn = BluetoothInfo
+		return
+	}
+	bluetoothInfoFn = fn
 }

@@ -133,79 +133,111 @@ func parseBoolByte(value string) (byte, error) {
 	}
 }
 
-func FeatureCommandPacket(fields []string, allowUnsafe bool, model ModelInfo) (Packet, []string, error) {
-	if len(fields) == 0 {
-		return Packet{}, nil, fmt.Errorf("missing feature command")
-	}
-
+func parseFeatureFields(fields []string) (FeatureCommand, string, []string, error) {
 	spec, ok := featureCommands[strings.ToLower(fields[0])]
 	if !ok {
-		return Packet{}, nil, fmt.Errorf("unknown feature command %q", fields[0])
+		return FeatureCommand{}, "", nil, fmt.Errorf("unknown feature command %q", fields[0])
 	}
-
 	action := "get"
 	args := fields[1:]
 	if len(args) > 0 {
 		action = strings.ToLower(args[0])
 		args = args[1:]
 	}
+	return spec, action, args, nil
+}
 
-	var warnings []string
-	if !ModelSupportsFeature(model, spec.Feature) {
-		warnings = append(warnings, fmt.Sprintf("%s is not listed for model %s tier %s", spec.Name, model.Codename, model.Tier))
+func featureWarnings(model ModelInfo, spec FeatureCommand) []string {
+	if ModelSupportsFeature(model, spec.Feature) {
+		return nil
+	}
+	return []string{fmt.Sprintf("%s is not listed for model %s tier %s", spec.Name, model.Codename, model.Tier)}
+}
+
+func buildFeatureGetPacket(spec FeatureCommand, args []string) (Packet, error) {
+	if len(args) != 0 {
+		return Packet{}, fmt.Errorf("usage: %s", spec.Usage)
+	}
+	return Packet{
+		Cmd:     spec.GetCommand,
+		Payload: append([]byte(nil), spec.GetPayload...),
+	}, nil
+}
+
+func buildFeatureListPacket(spec FeatureCommand, args []string) (Packet, error) {
+	if spec.Feature != "dual" || len(args) != 0 {
+		return Packet{}, fmt.Errorf("usage: %s", spec.Usage)
+	}
+	return Packet{Cmd: CmdGetDualDeviceList, Payload: []byte{0}}, nil
+}
+
+func buildFeatureDualConnectPacket(spec FeatureCommand, action string, args []string, allowUnsafe bool) (Packet, []string, error) {
+	if err := validateDualConnectRequest(spec, action, args, allowUnsafe); err != nil {
+		return Packet{}, nil, err
+	}
+	payload, warnings, err := BuildDualConnectPayload(action == "connect", args[0])
+	if err != nil {
+		return Packet{}, nil, err
+	}
+	return Packet{Cmd: CmdSetConnectDevice, Payload: payload}, warnings, nil
+}
+
+func validateDualConnectRequest(spec FeatureCommand, action string, args []string, allowUnsafe bool) error {
+	if !allowUnsafe && !spec.SafeSet {
+		return fmt.Errorf("dual %s writes to the device; re-run with --unsafe to allow it", action)
+	}
+	if spec.Feature != "dual" {
+		return fmt.Errorf("usage: %s", spec.Usage)
+	}
+	if len(args) != 1 {
+		return fmt.Errorf("usage: dual %s <mac>", action)
+	}
+	return nil
+}
+
+func buildFeatureSetPacket(spec FeatureCommand, args []string, allowUnsafe bool, model ModelInfo) (Packet, error) {
+	if !allowUnsafe && !spec.SafeSet {
+		return Packet{}, fmt.Errorf("%s set writes to the device; re-run with --unsafe to allow it", spec.Name)
+	}
+	if model.Codename == "" {
+		return Packet{}, fmt.Errorf("%s set requires a known model; pass --model or connect through discovery so it can be auto-detected", spec.Name)
+	}
+	payload, err := spec.BuildSetPayload(model, args)
+	if err != nil {
+		return Packet{}, err
+	}
+	return Packet{Cmd: spec.SetCommand, Payload: payload}, nil
+}
+
+func FeatureCommandPacket(fields []string, allowUnsafe bool, model ModelInfo) (Packet, []string, error) {
+	if len(fields) == 0 {
+		return Packet{}, nil, fmt.Errorf("missing feature command")
 	}
 
+	spec, action, args, err := parseFeatureFields(fields)
+	if err != nil {
+		return Packet{}, nil, err
+	}
+
+	warnings := featureWarnings(model, spec)
+	return buildFeatureActionPacket(spec, action, args, allowUnsafe, model, warnings)
+}
+
+func buildFeatureActionPacket(spec FeatureCommand, action string, args []string, allowUnsafe bool, model ModelInfo, warnings []string) (Packet, []string, error) {
 	switch action {
 	case "get":
-		if len(args) != 0 {
-			return Packet{}, warnings, fmt.Errorf("usage: %s", spec.Usage)
-		}
-
-		return Packet{
-			Cmd:     spec.GetCommand,
-			Payload: append([]byte(nil), spec.GetPayload...),
-		}, warnings, nil
+		pkt, err := buildFeatureGetPacket(spec, args)
+		return pkt, warnings, err
 	case "list":
-		if spec.Feature != "dual" || len(args) != 0 {
-			return Packet{}, warnings, fmt.Errorf("usage: %s", spec.Usage)
-		}
-		return Packet{Cmd: CmdGetDualDeviceList, Payload: []byte{0}}, warnings, nil
+		pkt, err := buildFeatureListPacket(spec, args)
+		return pkt, warnings, err
 	case "connect", "disconnect":
-		if !allowUnsafe && !spec.SafeSet {
-			return Packet{}, warnings, fmt.Errorf("dual %s writes to the device; re-run with --unsafe to allow it", action)
-		}
-		if spec.Feature != "dual" {
-			return Packet{}, warnings, fmt.Errorf("usage: %s", spec.Usage)
-		}
-		if len(args) != 1 {
-			return Packet{}, warnings, fmt.Errorf("usage: dual %s <mac>", action)
-		}
-		payload, connectWarnings, err := BuildDualConnectPayload(action == "connect", args[0])
-		if err != nil {
-			return Packet{}, warnings, err
-		}
+		pkt, connectWarnings, err := buildFeatureDualConnectPacket(spec, action, args, allowUnsafe)
 		warnings = append(warnings, connectWarnings...)
-		return Packet{
-			Cmd:     CmdSetConnectDevice,
-			Payload: payload,
-		}, warnings, nil
+		return pkt, warnings, err
 	case "set":
-		if !allowUnsafe && !spec.SafeSet {
-			return Packet{}, warnings, fmt.Errorf("%s set writes to the device; re-run with --unsafe to allow it", spec.Name)
-		}
-		if model.Codename == "" {
-			return Packet{}, warnings, fmt.Errorf("%s set requires a known model; pass --model or connect through discovery so it can be auto-detected", spec.Name)
-		}
-
-		payload, err := spec.BuildSetPayload(model, args)
-		if err != nil {
-			return Packet{}, warnings, err
-		}
-
-		return Packet{
-			Cmd:     spec.SetCommand,
-			Payload: payload,
-		}, warnings, nil
+		pkt, err := buildFeatureSetPacket(spec, args, allowUnsafe, model)
+		return pkt, warnings, err
 	default:
 		return Packet{}, warnings, fmt.Errorf("usage: %s", spec.Usage)
 	}

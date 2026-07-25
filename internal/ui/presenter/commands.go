@@ -88,15 +88,18 @@ func IsToggleSetCommand(c Command) bool {
 // ToggleFeatures extracts on/off switch features from a command catalog. A
 // feature is included only when both its "on" and "off" SET commands exist.
 func ToggleFeatures(commands []Command) []ToggleFeature {
-	type pair struct{ on, off []string }
-	found := map[string]*pair{}
+	return buildToggleFeatures(collectTogglePairs(commands))
+}
+
+func collectTogglePairs(commands []Command) map[string]*togglePair {
+	found := map[string]*togglePair{}
 	for _, c := range commands {
 		if !IsToggleSetCommand(c) {
 			continue
 		}
 		p := found[c.Fields[0]]
 		if p == nil {
-			p = &pair{}
+			p = &togglePair{}
 			found[c.Fields[0]] = p
 		}
 		if strings.EqualFold(c.Fields[2], "on") {
@@ -105,6 +108,14 @@ func ToggleFeatures(commands []Command) []ToggleFeature {
 			p.off = c.Fields
 		}
 	}
+	return found
+}
+
+type togglePair struct {
+	on, off []string
+}
+
+func buildToggleFeatures(found map[string]*togglePair) []ToggleFeature {
 	out := make([]ToggleFeature, 0, len(toggleLabels))
 	for _, t := range toggleLabels {
 		if p := found[t.feature]; p != nil && p.on != nil && p.off != nil {
@@ -138,26 +149,14 @@ func BuildCommands(model spp.ModelInfo, dualDevices []spp.DualDevice, allowUnsaf
 		{Title: "Info: firmware", Desc: "GET firmware version", Cmd: spp.CmdGetFirmwareVersion},
 		{Title: "Info: config", Desc: "GET remote config", Cmd: spp.CmdGetRemoteConfig},
 	}
-	features := []Command{
+	featureGets := []Command{
 		{Title: "Audio: anc get", Desc: "Current ANC mode", Fields: []string{"anc", "get"}},
 		{Title: "Audio: eq get", Desc: "Current EQ mode", Fields: []string{"eq", "get"}},
 		{Title: "Audio: spatial get", Desc: "Spatial audio status", Fields: []string{"spatial", "get"}},
 		{Title: "Audio: low latency get", Desc: "Low-latency mode status", Fields: []string{"lag", "get"}},
 		{Title: "Audio: dual get", Desc: "Dual connection status", Fields: []string{"dual", "get"}},
 	}
-	items := make([]Command, 0, len(base)+len(features)+16)
-	for _, item := range base {
-		items = append(items, item)
-	}
-	for _, item := range features {
-		// Feature key comes from the command fields ("lag", "anc", ...), not the
-		// display title: "Audio: low latency get" would otherwise resolve to "low".
-		feature := item.Fields[0]
-		if spp.ModelSupportsFeature(model, feature) {
-			items = append(items, item)
-		}
-	}
-	for _, item := range []Command{
+	featureSets := []Command{
 		{Title: "SET: anc off", Desc: "Disable ANC", Fields: []string{"anc", "set", "off"}},
 		{Title: "SET: anc strong", Desc: "ANC high", Fields: []string{"anc", "set", "strong"}},
 		{Title: "SET: anc medium", Desc: "ANC mid", Fields: []string{"anc", "set", "medium"}},
@@ -172,12 +171,33 @@ func BuildCommands(model spp.ModelInfo, dualDevices []spp.DualDevice, allowUnsaf
 		{Title: "SET: low latency off", Desc: "Disable low-latency mode", Fields: []string{"lag", "set", "off"}},
 		{Title: "SET: dual on", Desc: "Enable dual connection", Fields: []string{"dual", "set", "on"}},
 		{Title: "SET: dual off", Desc: "Disable dual connection", Fields: []string{"dual", "set", "off"}},
-	} {
+	}
+	items := make([]Command, 0, len(base)+len(featureGets)+len(featureSets)+len(dualDevices)+1)
+	items = append(items, base...)
+	items = appendSupportedFeatureCommands(items, model, featureGets)
+	items = appendSupportedFeatureCommands(items, model, featureSets)
+	items = appendDualDeviceCommands(items, dualDevices)
+	if allowUnsafe {
+		items = append(items, Command{
+			Title:    "Advanced: raw scan",
+			Desc:     "Comment: scan c001 c020 500ms; GET 0xC0xx only",
+			Advanced: true,
+		})
+	}
+	return items
+}
+
+func appendSupportedFeatureCommands(items []Command, model spp.ModelInfo, cmds []Command) []Command {
+	for _, item := range cmds {
 		feature := item.Fields[0]
 		if spp.ModelSupportsFeature(model, feature) {
 			items = append(items, item)
 		}
 	}
+	return items
+}
+
+func appendDualDeviceCommands(items []Command, dualDevices []spp.DualDevice) []Command {
 	for _, dev := range dualDevices {
 		action := "connect"
 		if dev.Connected {
@@ -191,13 +211,6 @@ func BuildCommands(model spp.ModelInfo, dualDevices []spp.DualDevice, allowUnsaf
 			Title:  fmt.Sprintf("Dual: %s %s", action, name),
 			Desc:   fmt.Sprintf("%s %s via SET_CONNECT_DEVICE", action, dev.MAC),
 			Fields: []string{"dual", action, dev.MAC},
-		})
-	}
-	if allowUnsafe {
-		items = append(items, Command{
-			Title:    "Advanced: raw scan",
-			Desc:     "Comment: scan c001 c020 500ms; GET 0xC0xx only",
-			Advanced: true,
 		})
 	}
 	return items

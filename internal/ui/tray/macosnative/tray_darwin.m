@@ -3,7 +3,7 @@
 
 @class TrayMenuHandler;
 
-extern void tray_go_menu_click(int32_t tag);
+extern void TrayGoMenuClick(int32_t tag);
 
 static NSStatusItem *statusItem = nil;
 static NSMenuItem *statusMenuItem = nil;
@@ -17,7 +17,7 @@ static TrayMenuHandler *menuHandler = nil;
 @implementation TrayMenuHandler
 - (void)handleMenu:(id)sender {
   NSMenuItem *item = (NSMenuItem *)sender;
-  tray_go_menu_click((int32_t)[item tag]);
+  TrayGoMenuClick((int32_t)[item tag]);
 }
 @end
 

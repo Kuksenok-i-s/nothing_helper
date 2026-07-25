@@ -1,6 +1,7 @@
 package dualprompt
 
 import (
+	"errors"
 	"testing"
 
 	"tws_manager/internal/dualpolicy"
@@ -41,5 +42,32 @@ func TestAcceptFields_ReturnsHostMAC(t *testing.T) {
 	}
 	if len(fields) != 3 || fields[2] != "AA:BB:CC:DD:EE:FF" {
 		t.Fatalf("fields = %v", fields)
+	}
+}
+
+func TestEnsureHostMACLoadsAdapter(t *testing.T) {
+	dualpolicy.SetHostAdapterMACHook(func() (string, error) {
+		return "AA:BB:CC:DD:EE:FF", nil
+	})
+	t.Cleanup(func() { dualpolicy.SetHostAdapterMACHook(nil) })
+
+	c := &Controller{}
+	c.EnsureHostMAC()
+	if c.HostMAC != "AA:BB:CC:DD:EE:FF" || c.HostErr != "" {
+		t.Fatalf("HostMAC=%q HostErr=%q", c.HostMAC, c.HostErr)
+	}
+	c.EnsureHostMAC()
+}
+
+func TestEnsureHostMACRecordsError(t *testing.T) {
+	dualpolicy.SetHostAdapterMACHook(func() (string, error) {
+		return "", errors.New("adapter unavailable")
+	})
+	t.Cleanup(func() { dualpolicy.SetHostAdapterMACHook(nil) })
+
+	c := &Controller{}
+	c.EnsureHostMAC()
+	if c.HostErr == "" {
+		t.Fatal("expected host error")
 	}
 }

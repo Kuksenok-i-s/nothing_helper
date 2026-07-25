@@ -123,6 +123,13 @@ func TestParseConfigRealDeviceFixture(t *testing.T) {
 	}
 }
 
+func TestSummarizeConfigPacketEmpty(t *testing.T) {
+	got := summarizeConfigPacket("config_response", nil)
+	if got.Summary != "config_response: (empty)" {
+		t.Fatalf("summary = %q", got.Summary)
+	}
+}
+
 func TestParseANCRealDeviceFixture(t *testing.T) {
 	// Real Ear (3) ANC: triples (1=mode,1=high,0) (2=level,1=high,0).
 	pkt := Packet{Cmd: CmdRspANC, Payload: []byte{0x01, 0x01, 0x00, 0x02, 0x01, 0x00}}
@@ -486,6 +493,25 @@ func TestParseDualDeviceListPayloadTruncated(t *testing.T) {
 	}
 }
 
+func TestParseDualDeviceListFixedWidthName(t *testing.T) {
+	fixedName := []byte("My Phone Name Fixed Width Pad!!")
+	if len(fixedName) != 31 {
+		t.Fatalf("fixed name len = %d", len(fixedName))
+	}
+	payload := append([]byte{
+		0x01, 0x00, 0x01,
+		0x11, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
+		0xff,
+	}, fixedName...)
+	list, err := ParseDualDeviceListPayload(payload)
+	if err != nil {
+		t.Fatalf("ParseDualDeviceListPayload() = %v", err)
+	}
+	if got := list.Devices[0].Name; !strings.Contains(got, "My Phone Name Fixed Width Pad") {
+		t.Fatalf("name = %q", got)
+	}
+}
+
 func TestCmdBudsBatteryCatalogMatchesParser(t *testing.T) {
 	info := CommandInfoFor(CmdBudsBattery)
 	if info.Name != "event_buds_battery" || info.Kind != "battery_pairs" {
@@ -570,5 +596,51 @@ func TestParseScanCommand(t *testing.T) {
 	}
 	if start != 0xc001 || end != 0xc020 || delay != 500*time.Millisecond {
 		t.Fatalf("scan = %04x %04x %s, want c001 c020 500ms", start, end, delay)
+	}
+}
+
+func TestParseUnknownPacketText(t *testing.T) {
+	pkt := Packet{Cmd: 0x4999, Payload: []byte("hello")}
+	got := parseUnknownPacket(pkt, DefaultModel())
+	if got.Kind != "unknown_text" || !strings.Contains(got.Summary, "hello") {
+		t.Fatalf("parseUnknownPacket() = %+v", got)
+	}
+}
+
+func TestParseUnknownPacketBatteryPairs(t *testing.T) {
+	pkt := Packet{Cmd: 0x4999, Payload: []byte{0x02, 0x50, 0x03, 0x60}}
+	got := parseUnknownPacket(pkt, DefaultModel())
+	if got.Kind != "unknown_battery_pairs" || len(got.Batteries) == 0 {
+		t.Fatalf("parseUnknownPacket() = %+v", got)
+	}
+}
+
+func TestParseUnknownPacketBinary(t *testing.T) {
+	pkt := Packet{Cmd: 0x4999, Payload: []byte{0xab, 0xcd, 0xef}}
+	got := parseUnknownPacket(pkt, DefaultModel())
+	if got.Kind != "unknown" || !strings.Contains(got.Summary, "bits=") {
+		t.Fatalf("parseUnknownPacket() = %+v", got)
+	}
+}
+
+func TestParseUnknownPacketLargePayload(t *testing.T) {
+	pkt := Packet{Cmd: 0x4999, Payload: bytes.Repeat([]byte{0xff}, 16)}
+	got := parseUnknownPacket(pkt, DefaultModel())
+	if got.Kind != "unknown" || strings.Contains(got.Summary, "bits=") {
+		t.Fatalf("parseUnknownPacket() = %+v", got)
+	}
+}
+
+func TestFeatureCommandPacketMissing(t *testing.T) {
+	_, _, err := FeatureCommandPacket(nil, false, DefaultModel())
+	if err == nil {
+		t.Fatal("expected missing command error")
+	}
+}
+
+func TestFeatureCommandPacketUnknown(t *testing.T) {
+	_, _, err := FeatureCommandPacket([]string{"nope"}, false, DefaultModel())
+	if err == nil {
+		t.Fatal("expected unknown command error")
 	}
 }

@@ -32,32 +32,45 @@ func Execute(sess *session.Session, cmd presenter.Command, opts ExecOpts) ExecRe
 	if presenter.IsScanCommand(cmd) {
 		return ExecResult{Err: fmt.Errorf("scan commands must use ExecuteScan")}
 	}
-	source := opts.Source
-	if source == "" {
-		source = "ui"
-	}
 	if len(cmd.Fields) > 0 {
-		pkt, warnings, err := sess.FeaturePacket(cmd.Fields)
-		if err != nil {
-			return ExecResult{Err: err}
-		}
-		comment := opts.Comment
-		if len(warnings) > 0 {
-			comment = strings.TrimSpace(comment + " " + strings.Join(warnings, "; "))
-		}
-		trigger := cmd.Title
-		if trigger == "" {
-			trigger = strings.Join(cmd.Fields, " ")
-		}
-		if err := sess.Send(pkt, session.Meta{Source: source, Trigger: trigger, UserComment: comment}); err != nil {
-			return ExecResult{Err: err}
-		}
-		return ExecResult{Warnings: warnings}
+		return executeFeatureCommand(sess, cmd, opts)
 	}
+	return executeCatalogCommand(sess, cmd, opts)
+}
+
+func executeFeatureCommand(sess *session.Session, cmd presenter.Command, opts ExecOpts) ExecResult {
+	source := execSource(opts.Source)
+	pkt, warnings, err := sess.FeaturePacket(cmd.Fields)
+	if err != nil {
+		return ExecResult{Err: err}
+	}
+	comment := opts.Comment
+	if len(warnings) > 0 {
+		comment = strings.TrimSpace(comment + " " + strings.Join(warnings, "; "))
+	}
+	trigger := cmd.Title
+	if trigger == "" {
+		trigger = strings.Join(cmd.Fields, " ")
+	}
+	if err := sess.Send(pkt, session.Meta{Source: source, Trigger: trigger, UserComment: comment}); err != nil {
+		return ExecResult{Err: err}
+	}
+	return ExecResult{Warnings: warnings}
+}
+
+func executeCatalogCommand(sess *session.Session, cmd presenter.Command, opts ExecOpts) ExecResult {
+	source := execSource(opts.Source)
 	if err := sess.SendCommand(cmd.Cmd, session.Meta{Source: source, Trigger: cmd.Title, UserComment: opts.Comment}); err != nil {
 		return ExecResult{Err: err}
 	}
 	return ExecResult{}
+}
+
+func execSource(source string) string {
+	if source == "" {
+		return "ui"
+	}
+	return source
 }
 
 // ExecuteScan runs a validated GET scan range.

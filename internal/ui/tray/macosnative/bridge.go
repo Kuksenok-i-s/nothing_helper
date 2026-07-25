@@ -22,8 +22,8 @@ import "C"
 // MenuClickHandler receives tray menu item tag clicks from Cocoa.
 var MenuClickHandler func(tag int32)
 
-//export tray_go_menu_click
-func tray_go_menu_click(tag int32) {
+//export TrayGoMenuClick
+func TrayGoMenuClick(tag int32) {
 	if MenuClickHandler != nil {
 		MenuClickHandler(tag)
 	}

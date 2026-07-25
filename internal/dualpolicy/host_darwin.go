@@ -3,6 +3,7 @@
 package dualpolicy
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -18,7 +19,7 @@ func HostAdapterMAC() (string, error) {
 	if mac, err := bt.HostAdapterMAC(); err == nil && mac != "" {
 		return mac, nil
 	}
-	out, err := exec.Command("system_profiler", "SPBluetoothDataType").CombinedOutput()
+	out, err := exec.CommandContext(context.Background(), "system_profiler", "SPBluetoothDataType").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("system_profiler SPBluetoothDataType: %w", err)
 	}

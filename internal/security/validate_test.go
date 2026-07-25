@@ -63,6 +63,15 @@ func TestValidateChannel(t *testing.T) {
 	}
 }
 
+func TestValidateRFCOMMNumber(t *testing.T) {
+	if err := ValidateRFCOMMNumber("0"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateRFCOMMNumber("abc"); err == nil {
+		t.Fatal("expected invalid RFCOMM number")
+	}
+}
+
 func TestValidateWritablePath(t *testing.T) {
 	dir := t.TempDir()
 	abs, err := ValidateWritablePath(dir)

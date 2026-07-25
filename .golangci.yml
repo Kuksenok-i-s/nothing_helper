@@ -1,0 +1,88 @@
+# golangci-lint v2 configuration template.
+#
+# A curated, low-noise linter set on top of the standard set (errcheck,
+# govet, staticcheck, unused, ineffassign), chosen to reinforce Effective Go
+# and the Go Wiki Code Review Comments checklist:
+#   - errorlint / contextcheck: Go 1.13+ error wrapping and context
+#     propagation (go.dev/wiki/CodeReviewComments#contexts)
+#   - godot: doc comments should be full sentences ending in a period
+#     (go.dev/wiki/CodeReviewComments#comment-sentences)
+#   - revive / gocritic: general style and correctness, the maintained
+#     successor to the now-archived golint
+#
+# Drop this in as .golangci.yml if the target repo doesn't already have one.
+# Run locally with: golangci-lint run
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+  enable:
+    - contextcheck
+    - errorlint
+    - godot
+    # goconst omitted: SPP catalogs / feature keys intentionally repeat short
+    # protocol tokens ("anc", "query", "set", ...); constifying them hurts
+    # readability more than it helps in this domain.
+    - gocritic
+    - misspell
+    - noctx
+    - nolintlint
+    - revive
+    - unconvert
+    - unparam
+    - whitespace
+  settings:
+    revive:
+      rules:
+        - name: error-strings
+        - name: error-naming
+        - name: indent-error-flow
+        - name: receiver-naming
+        - name: var-naming
+    godot:
+      scope: declarations
+    errcheck:
+      # Writes to stdout/stderr and best-effort cleanup of a temp
+      # file/handle are rarely actionable per call site; adjust for your
+      # project if those errors matter more there.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintln
+        - fmt.Fprintf
+        - os.Remove
+        - (*os.File).Close
+  exclusions:
+    rules:
+      # Subprocess calls in test setup helpers usually don't need cancellation
+      # semantics the way production subprocess calls do.
+      - path: _test\.go
+        linters:
+          - noctx
+      # Used from systray/darwin build-tagged files; default lint tags miss them.
+      - path: internal/ui/tray/tray_common\.go
+        text: tooltipForSnapshot
+        linters:
+          - unused
+      # RFCOMM/sudo helpers are often interactive (stdin password / tty) and
+      # threaded through many call sites; full CommandContext propagation is a
+      # separate redesign. Prefer fixing callers that already have a ctx.
+      - path: internal/bt/
+        linters:
+          - noctx
+          - contextcheck
+      # Call sites into bt RFCOMM/discovery still trip contextcheck via the
+      # Discover/Release/Bind chain until that redesign lands.
+      - path: internal/connect/
+        linters:
+          - contextcheck
+      - path: internal/app/entry\.go
+        linters:
+          - contextcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

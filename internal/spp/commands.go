@@ -36,4 +36,3 @@ const (
 	CmdDualConnectChanged    = 0xE00E
 	CmdLagModeChanged        = 0xE019
 )
-

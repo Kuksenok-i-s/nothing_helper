@@ -67,7 +67,13 @@ func ResolveModelFromBluetooth(values ...string) (ModelInfo, string, bool) {
 			return model, strings.TrimSpace(value), true
 		}
 	}
+	if model, hint, ok := matchModelByFastPairID(values); ok {
+		return model, hint, true
+	}
+	return matchModelByProductSubstring(values)
+}
 
+func matchModelByFastPairID(values []string) (ModelInfo, string, bool) {
 	haystack := strings.ToUpper(strings.Join(values, "\n"))
 	for _, model := range knownModels {
 		fastPairID := strings.ToUpper(strings.TrimSpace(model.FastPairID))
@@ -75,7 +81,10 @@ func ResolveModelFromBluetooth(values ...string) (ModelInfo, string, bool) {
 			return model, "fast_pair_id:" + fastPairID, true
 		}
 	}
+	return ModelInfo{}, "", false
+}
 
+func matchModelByProductSubstring(values []string) (ModelInfo, string, bool) {
 	normalizedHaystack := normalizeModelKey(strings.Join(values, "\n"))
 	for _, model := range knownModels {
 		for _, candidate := range append([]string{model.Product, model.Codename}, model.Aliases...) {
@@ -85,7 +94,6 @@ func ResolveModelFromBluetooth(values ...string) (ModelInfo, string, bool) {
 			}
 		}
 	}
-
 	return ModelInfo{}, "", false
 }
 
@@ -113,4 +121,3 @@ func KnownModels() []ModelInfo {
 }
 
 func DefaultModel() ModelInfo { return ModelInfo{BatteryCaseSource: "case"} }
-

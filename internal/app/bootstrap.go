@@ -32,34 +32,17 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 		tracePath = filepath.Join(cfg.CaptureDir, "session_"+time.Now().Format("2006-01-02_15-04-05")+".ndjson")
 	}
 
-	var logger *trace.Logger
-	if tracePath != "" {
-		var err error
-		logger, err = trace.NewLogger(tracePath, cfg.LogRaw)
-		if err != nil {
-			return nil, fmt.Errorf("open trace log %q: %w", tracePath, err)
-		}
+	logger, err := openBootstrapLogger(tracePath, cfg.LogRaw)
+	if err != nil {
+		return nil, err
 	}
 
 	sess := session.New(logger, cfg.AllowUnsafe, cfg.ProbeEnabled)
 	sess.SetCaptureDir(cfg.CaptureDir)
-	if cfg.ModelName != "" {
-		model, ok := spp.ResolveModelInfo(cfg.ModelName)
-		if !ok {
-			if logger != nil {
-				_ = logger.Close()
-			}
-			return nil, fmt.Errorf("unknown model %q", cfg.ModelName)
-		}
-		sess.SetModel(model)
+	if err := applyBootstrapModel(sess, logger, cfg.ModelName); err != nil {
+		return nil, err
 	}
-	queryEvery := cfg.QueryEvery
-	if cfg.Notify && queryEvery <= 0 {
-		queryEvery = 60 * time.Second
-	}
-	if queryEvery > 0 {
-		sess.StartBatteryPolling(ctx, queryEvery)
-	}
+	startBootstrapPolling(ctx, sess, cfg)
 
 	return &Runtime{
 		Session:   sess,
@@ -67,6 +50,42 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 		Config:    cfg,
 		TracePath: tracePath,
 	}, nil
+}
+
+func openBootstrapLogger(tracePath string, logRaw bool) (*trace.Logger, error) {
+	if tracePath == "" {
+		return nil, nil
+	}
+	logger, err := trace.NewLogger(tracePath, logRaw)
+	if err != nil {
+		return nil, fmt.Errorf("open trace log %q: %w", tracePath, err)
+	}
+	return logger, nil
+}
+
+func applyBootstrapModel(sess *session.Session, logger *trace.Logger, modelName string) error {
+	if modelName == "" {
+		return nil
+	}
+	model, ok := spp.ResolveModelInfo(modelName)
+	if !ok {
+		if logger != nil {
+			_ = logger.Close()
+		}
+		return fmt.Errorf("unknown model %q", modelName)
+	}
+	sess.SetModel(model)
+	return nil
+}
+
+func startBootstrapPolling(ctx context.Context, sess *session.Session, cfg Config) {
+	queryEvery := cfg.QueryEvery
+	if cfg.Notify && queryEvery <= 0 {
+		queryEvery = 60 * time.Second
+	}
+	if queryEvery > 0 {
+		sess.StartBatteryPolling(ctx, queryEvery)
+	}
 }
 
 // WarmupPrivileges warms up the selected privilege backend when needed.

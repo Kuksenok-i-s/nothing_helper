@@ -50,7 +50,7 @@ func (s *State) runAutoReconnectLoop() {
 // doAuto searches for available headphones and connects to the best candidate
 // in one click (discover → bind → connect), updating the device list as it goes.
 func (s *State) doAuto() {
-	go func() {
+	s.goUI(func() {
 		setStatus := func(msg string) {
 			s.mu.Lock()
 			s.presenter.Status = msg
@@ -81,7 +81,7 @@ func (s *State) doAuto() {
 		}
 		s.mu.Unlock()
 		s.invalidate()
-	}()
+	})
 }
 
 func (s *State) connectInitial(dev bt.Device) {
@@ -118,7 +118,7 @@ func (s *State) ConnectChosen(i int) {
 	dev := s.devices[i]
 	s.selectedDev = i
 	s.mu.Unlock()
-	go func() {
+	s.goUI(func() {
 		name := dev.Name
 		if name == "" {
 			name = dev.MAC
@@ -131,11 +131,11 @@ func (s *State) ConnectChosen(i int) {
 			return
 		}
 		s.SetStatus("connected to " + name)
-	}()
+	})
 }
 
 func (s *State) doDiscover() {
-	go func() {
+	s.goUI(func() {
 		devs, err := s.manager.Discover(s.ctx)
 		s.mu.Lock()
 		if err != nil {
@@ -151,7 +151,7 @@ func (s *State) doDiscover() {
 		}
 		s.mu.Unlock()
 		s.invalidate()
-	}()
+	})
 }
 
 func (s *State) doBind() {
@@ -163,7 +163,7 @@ func (s *State) doBind() {
 		s.invalidate()
 		return
 	}
-	go func() {
+	s.goUI(func() {
 		err := s.manager.Bind(s.ctx, dev)
 		s.mu.Lock()
 		if err != nil {
@@ -174,12 +174,12 @@ func (s *State) doBind() {
 		}
 		s.mu.Unlock()
 		s.invalidate()
-	}()
+	})
 }
 
 func (s *State) doConnect() {
 	dev := s.selectedDevice()
-	go func() {
+	s.goUI(func() {
 		err := s.manager.Connect(s.ctx, dev)
 		s.mu.Lock()
 		if err != nil {
@@ -190,11 +190,11 @@ func (s *State) doConnect() {
 		}
 		s.mu.Unlock()
 		s.invalidate()
-	}()
+	})
 }
 
 func (s *State) doDisconnect() {
-	go func() {
+	s.goUI(func() {
 		err := s.manager.Disconnect()
 		s.mu.Lock()
 		if err != nil {
@@ -205,11 +205,11 @@ func (s *State) doDisconnect() {
 		}
 		s.mu.Unlock()
 		s.invalidate()
-	}()
+	})
 }
 
 func (s *State) doBattery() {
-	go func() {
+	s.goUI(func() {
 		err := s.session.SendCommand(spp.CmdGetBattery, session.Meta{Source: "gio", Trigger: "battery"})
 		s.mu.Lock()
 		if err != nil {
@@ -217,11 +217,11 @@ func (s *State) doBattery() {
 		}
 		s.mu.Unlock()
 		s.invalidate()
-	}()
+	})
 }
 
 func (s *State) doExport() {
-	go func() {
+	s.goUI(func() {
 		s.mu.Lock()
 		events := append([]trace.Event(nil), s.presenter.LastEvents...)
 		dir := s.captureDir
@@ -244,7 +244,7 @@ func (s *State) doExport() {
 		}
 		s.mu.Unlock()
 		s.invalidate()
-	}()
+	})
 }
 
 func (s *State) selectedDevice() bt.Device {

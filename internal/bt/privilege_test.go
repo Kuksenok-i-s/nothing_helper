@@ -3,6 +3,7 @@
 package bt
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -69,4 +70,88 @@ func containsArgPair(args []string, key, value string) bool {
 		}
 	}
 	return false
+}
+
+func TestWithPrivilegeFallbackModes(t *testing.T) {
+	called := struct{ polkit, sudo int }{}
+	polkitFn := func() error {
+		called.polkit++
+		if called.polkit < 0 {
+			return errors.New("unreachable")
+		}
+		return nil
+	}
+	sudoFn := func() error {
+		called.sudo++
+		if called.sudo < 0 {
+			return errors.New("unreachable")
+		}
+		return nil
+	}
+
+	t.Run("polkit", func(t *testing.T) {
+		if err := ConfigurePrivileges("polkit", ""); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = ConfigurePrivileges("sudo", "") })
+		called.polkit, called.sudo = 0, 0
+		if err := withPrivilegeFallback(polkitFn, sudoFn); err != nil {
+			t.Fatal(err)
+		}
+		if called.polkit != 1 || called.sudo != 0 {
+			t.Fatalf("polkit=%d sudo=%d", called.polkit, called.sudo)
+		}
+	})
+
+	t.Run("sudo", func(t *testing.T) {
+		if err := ConfigurePrivileges("sudo", ""); err != nil {
+			t.Fatal(err)
+		}
+		called.polkit, called.sudo = 0, 0
+		if err := withPrivilegeFallback(polkitFn, sudoFn); err != nil {
+			t.Fatal(err)
+		}
+		if called.polkit != 0 || called.sudo != 1 {
+			t.Fatalf("polkit=%d sudo=%d", called.polkit, called.sudo)
+		}
+	})
+
+	t.Run("none", func(t *testing.T) {
+		if err := ConfigurePrivileges("none", ""); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = ConfigurePrivileges("sudo", "") })
+		if err := withPrivilegeFallback(polkitFn, sudoFn); err == nil {
+			t.Fatal("expected error for none mode")
+		}
+	})
+
+	t.Run("auto polkit ok", func(t *testing.T) {
+		if err := ConfigurePrivileges("auto", ""); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = ConfigurePrivileges("sudo", "") })
+		called.polkit, called.sudo = 0, 0
+		if err := withPrivilegeFallback(polkitFn, sudoFn); err != nil {
+			t.Fatal(err)
+		}
+		if called.polkit != 1 || called.sudo != 0 {
+			t.Fatalf("polkit=%d sudo=%d", called.polkit, called.sudo)
+		}
+	})
+
+	t.Run("auto polkit fail sudo ok", func(t *testing.T) {
+		if err := ConfigurePrivileges("auto", ""); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = ConfigurePrivileges("sudo", "") })
+		called.polkit, called.sudo = 0, 0
+		failPolkit := func() error { called.polkit++; return fmt.Errorf("polkit down") }
+		if err := withPrivilegeFallback(failPolkit, sudoFn); err != nil {
+			t.Fatal(err)
+		}
+		if called.polkit != 1 || called.sudo != 1 {
+			t.Fatalf("polkit=%d sudo=%d", called.polkit, called.sudo)
+		}
+	})
 }

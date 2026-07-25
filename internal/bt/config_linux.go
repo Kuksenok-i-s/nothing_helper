@@ -7,31 +7,45 @@ import (
 )
 
 func sanitizeConfig(cfg Config) Config {
-	out := Config{Devices: map[string]string{}, Channels: map[string]int{}}
-	if cfg.Devices != nil {
-		for path, mac := range cfg.Devices {
-			devPath, err := security.ValidateRFCOMMDevice(path)
-			if err != nil {
-				continue
-			}
-			normMAC, err := security.NormalizeMAC(mac)
-			if err != nil {
-				continue
-			}
-			out.Devices[devPath] = normMAC
-		}
+	return Config{
+		Devices:  sanitizeDeviceMap(cfg.Devices),
+		Channels: sanitizeChannelMap(cfg.Channels),
 	}
-	if cfg.Channels != nil {
-		for mac, channel := range cfg.Channels {
-			normMAC, err := security.NormalizeMAC(mac)
-			if err != nil {
-				continue
-			}
-			if err := security.ValidateChannel(channel); err != nil {
-				continue
-			}
-			out.Channels[normMAC] = channel
+}
+
+func sanitizeDeviceMap(devices map[string]string) map[string]string {
+	out := map[string]string{}
+	if devices == nil {
+		return out
+	}
+	for path, mac := range devices {
+		devPath, err := security.ValidateRFCOMMDevice(path)
+		if err != nil {
+			continue
 		}
+		normMAC, err := security.NormalizeMAC(mac)
+		if err != nil {
+			continue
+		}
+		out[devPath] = normMAC
+	}
+	return out
+}
+
+func sanitizeChannelMap(channels map[string]int) map[string]int {
+	out := map[string]int{}
+	if channels == nil {
+		return out
+	}
+	for mac, channel := range channels {
+		normMAC, err := security.NormalizeMAC(mac)
+		if err != nil {
+			continue
+		}
+		if err := security.ValidateChannel(channel); err != nil {
+			continue
+		}
+		out[normMAC] = channel
 	}
 	return out
 }

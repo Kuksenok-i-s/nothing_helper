@@ -6,14 +6,14 @@ import (
 )
 
 var (
-	ErrRFCOMMBindFailed      = errors.New("rfcomm bind failed")
-	ErrRFCOMMWaitFailed      = errors.New("rfcomm device wait failed")
-	ErrRFCOMMOpenFailed      = errors.New("rfcomm open failed")
-	ErrRFCOMMReviveFailed    = errors.New("rfcomm revive failed")
-	ErrRFCOMMPermission      = errors.New("rfcomm permission denied")
-	ErrRFCOMMNoChannel       = errors.New("no working rfcomm channel")
-	ErrBluetoothctlInfo      = errors.New("bluetoothctl info failed")
-	ErrInvalidBluetoothMAC   = errors.New("invalid bluetooth mac")
+	ErrRFCOMMBindFailed    = errors.New("rfcomm bind failed")
+	ErrRFCOMMWaitFailed    = errors.New("rfcomm device wait failed")
+	ErrRFCOMMOpenFailed    = errors.New("rfcomm open failed")
+	ErrRFCOMMReviveFailed  = errors.New("rfcomm revive failed")
+	ErrRFCOMMPermission    = errors.New("rfcomm permission denied")
+	ErrRFCOMMNoChannel     = errors.New("no working rfcomm channel")
+	ErrBluetoothctlInfo    = errors.New("bluetoothctl info failed")
+	ErrInvalidBluetoothMAC = errors.New("invalid bluetooth mac")
 )
 
 func wrapRFCOMMBind(err error) error {

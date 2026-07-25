@@ -98,9 +98,7 @@ func (m *Manager) SwitchTo(ctx context.Context, device bt.Device) error {
 	if device.MAC == "" {
 		return fmt.Errorf("device MAC is required to connect")
 	}
-	// If already linked to this device, keep it (idempotent).
-	if snap := m.sess.Snapshot(); snap.Connected &&
-		strings.EqualFold(snap.Device.MAC, device.MAC) {
+	if m.isConnectedTo(device.MAC) {
 		return nil
 	}
 	_ = m.sess.Close()
@@ -109,4 +107,9 @@ func (m *Manager) SwitchTo(ctx context.Context, device bt.Device) error {
 		return err
 	}
 	return m.Connect(ctx, device)
+}
+
+func (m *Manager) isConnectedTo(mac string) bool {
+	snap := m.sess.Snapshot()
+	return snap.Connected && strings.EqualFold(snap.Device.MAC, mac)
 }

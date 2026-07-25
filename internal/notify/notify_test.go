@@ -37,9 +37,9 @@ func TestFormatBatteries(t *testing.T) {
 
 func TestOrderedComponentsIncludesTwsAndExtras(t *testing.T) {
 	got := orderedComponents(map[string]spp.Battery{
-		"tws":   {Percent: 50},
-		"id_7":  {Percent: 40},
-		"left":  {Percent: 60},
+		"tws":  {Percent: 50},
+		"id_7": {Percent: 40},
+		"left": {Percent: 60},
 	})
 	want := []string{"left", "tws", "id_7"}
 	if len(got) != len(want) {

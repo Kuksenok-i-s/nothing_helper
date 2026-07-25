@@ -28,22 +28,34 @@ func ParseMode(raw string) (Mode, error) {
 	}
 }
 
+func normalizedHostMAC(hostMAC string) (string, bool) {
+	host, err := security.NormalizeMAC(hostMAC)
+	if err != nil || host == "" {
+		return "", false
+	}
+	return host, true
+}
+
+func connectedOwnerMAC(dev spp.DualDevice) (string, bool) {
+	if !dev.Connected || !dev.Owner || dev.MAC == "" {
+		return "", false
+	}
+	mac, err := security.NormalizeMAC(dev.MAC)
+	if err != nil {
+		return "", false
+	}
+	return mac, true
+}
+
 // HostOwnsDual reports whether the local Bluetooth adapter is connected and
 // marked owner in the dual device list.
 func HostOwnsDual(devices []spp.DualDevice, hostMAC string) bool {
-	host, err := security.NormalizeMAC(hostMAC)
-	if err != nil || host == "" {
+	host, ok := normalizedHostMAC(hostMAC)
+	if !ok {
 		return false
 	}
 	for _, dev := range devices {
-		if !dev.Connected || !dev.Owner || dev.MAC == "" {
-			continue
-		}
-		mac, err := security.NormalizeMAC(dev.MAC)
-		if err != nil {
-			continue
-		}
-		if mac == host {
+		if mac, ok := connectedOwnerMAC(dev); ok && mac == host {
 			return true
 		}
 	}
@@ -53,19 +65,12 @@ func HostOwnsDual(devices []spp.DualDevice, hostMAC string) bool {
 // PhoneOwner returns the dual-list peer that currently owns the connection when
 // it is not the local Bluetooth adapter (typically a phone).
 func PhoneOwner(devices []spp.DualDevice, hostMAC string) (spp.DualDevice, bool) {
-	host, err := security.NormalizeMAC(hostMAC)
-	if err != nil || host == "" {
+	host, ok := normalizedHostMAC(hostMAC)
+	if !ok {
 		return spp.DualDevice{}, false
 	}
 	for _, dev := range devices {
-		if !dev.Connected || !dev.Owner || dev.MAC == "" {
-			continue
-		}
-		mac, err := security.NormalizeMAC(dev.MAC)
-		if err != nil {
-			continue
-		}
-		if mac != host {
+		if mac, ok := connectedOwnerMAC(dev); ok && mac != host {
 			return dev, true
 		}
 	}

@@ -25,12 +25,9 @@ func ValidateFlags(devicePath, address string, channel int, captureDir, tracePat
 	if err != nil {
 		return Config{}, err
 	}
-	traceLogPath := tracePath
-	if traceLogPath != "" {
-		traceLogPath, err = security.ValidateWritablePath(traceLogPath)
-		if err != nil {
-			return Config{}, err
-		}
+	traceLogPath, err := validateOptionalTracePath(tracePath)
+	if err != nil {
+		return Config{}, err
 	}
 	return Config{
 		RFCOMMDevice: devPath,
@@ -39,4 +36,11 @@ func ValidateFlags(devicePath, address string, channel int, captureDir, tracePat
 		TracePath:    traceLogPath,
 		CaptureDir:   captureDirPath,
 	}, nil
+}
+
+func validateOptionalTracePath(tracePath string) (string, error) {
+	if tracePath == "" {
+		return "", nil
+	}
+	return security.ValidateWritablePath(tracePath)
 }

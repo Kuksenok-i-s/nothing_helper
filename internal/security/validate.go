@@ -83,18 +83,26 @@ func ValidateWritablePath(path string) (string, error) {
 	if strings.Contains(path, "..") {
 		return "", fmt.Errorf("path must not contain .. segments: %q", path)
 	}
-	if !filepath.IsAbs(path) {
-		abs, err := filepath.Abs(path)
-		if err != nil {
-			return "", fmt.Errorf("resolve path %q: %w", path, err)
-		}
-		path = abs
+	path, err := absoluteWritablePath(path)
+	if err != nil {
+		return "", err
 	}
 	clean := filepath.Clean(path)
 	if strings.Contains(clean, "..") {
 		return "", fmt.Errorf("path must not contain .. segments: %q", path)
 	}
 	return clean, nil
+}
+
+func absoluteWritablePath(path string) (string, error) {
+	if filepath.IsAbs(path) {
+		return path, nil
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("resolve path %q: %w", path, err)
+	}
+	return abs, nil
 }
 
 // ValidateRFCOMMNumber validates rfcomm CLI numeric argument.

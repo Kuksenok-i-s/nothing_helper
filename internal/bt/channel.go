@@ -57,4 +57,3 @@ func RememberDeviceChannel(mac string, channel int) error {
 	cfg.Channels[normMAC] = channel
 	return SaveConfig(path, cfg)
 }
-

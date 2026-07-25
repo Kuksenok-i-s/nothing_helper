@@ -211,4 +211,3 @@ func CommandCatalog() map[uint16]CommandInfo {
 	}
 	return out
 }
-

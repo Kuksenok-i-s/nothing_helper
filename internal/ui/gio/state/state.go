@@ -141,6 +141,19 @@ type sudoPasswordResult struct {
 	err      error
 }
 
+// goUI runs fn in a background goroutine that exits immediately when the
+// application context is already cancelled.
+func (s *State) goUI(fn func()) {
+	go func() {
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+		fn()
+	}()
+}
+
 // New creates application state from options.
 func New(ctx context.Context, w *app.Window, opts config.Options, sess *session.Session) *State {
 	s := &State{

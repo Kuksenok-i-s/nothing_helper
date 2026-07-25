@@ -4,6 +4,7 @@ package bt
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -19,6 +20,23 @@ import (
 	"tws_manager/internal/security"
 )
 
+const (
+	commandTimeout = 30 * time.Second
+	sudoTimeout    = 60 * time.Second
+)
+
+var execCombinedOutput = func(ctx context.Context, name string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	return cmd.CombinedOutput()
+}
+
+var (
+	execCmdRun            = func(cmd *exec.Cmd) error { return cmd.Run() }
+	execCmdCombinedOutput = func(cmd *exec.Cmd) ([]byte, error) { return cmd.CombinedOutput() }
+	execSudoHook          func(args ...string) error
+	bluetoothInfoFn       = BluetoothInfo
+)
+
 var (
 	sudoMu          sync.Mutex
 	sudoWarmupDone  bool
@@ -27,7 +45,6 @@ var (
 )
 
 func Discover() ([]Device, error) {
-	devices := map[string]Device{}
 	var warns []error
 	connected, err := bluetoothDevices("Connected")
 	if err != nil {
@@ -37,32 +54,15 @@ func Discover() ([]Device, error) {
 	if err != nil {
 		warns = append(warns, err)
 	}
-	for _, dev := range paired {
-		dev.Paired = true
-		devices[dev.MAC] = dev
-	}
-	for _, dev := range connected {
-		cur := devices[dev.MAC]
-		if cur.MAC == "" {
-			cur = dev
-		}
-		cur.Connected = true
-		if cur.Name == "" {
-			cur.Name = dev.Name
-		}
-		devices[dev.MAC] = cur
-	}
+	devices := mergeBluetoothLists(paired, connected)
 	out := make([]Device, 0, len(devices))
 	for _, dev := range devices {
 		info, infoErr := BluetoothInfo(dev.MAC)
 		if infoErr != nil {
 			warns = append(warns, infoErr)
 		}
-		dev.Info = info
-		applyBluetoothInfo(&dev, info)
-		dev.SPP = strings.Contains(strings.ToUpper(info), NothingSPPUUID)
-		dev.Channel = ResolveDeviceChannel(dev.MAC, DefaultRFCOMMChannel)
-		if isCandidate(dev) || dev.SPP {
+		dev = enrichDiscoveredDevice(dev, info)
+		if isDiscoveredCandidate(dev) {
 			out = append(out, dev)
 		}
 	}
@@ -112,7 +112,7 @@ func EnrichDeviceInfo(dev Device) Device {
 	if dev.MAC == "" {
 		return dev
 	}
-	info, err := BluetoothInfo(dev.MAC)
+	info, err := bluetoothInfoFn(dev.MAC)
 	if err != nil {
 		return dev
 	}
@@ -130,7 +130,9 @@ func WarmupSudo() (bool, error) {
 	}
 	sudoWarmupDone = true
 
-	cmd := exec.Command("sudo", "-v")
+	cmdCtx, cancel := context.WithTimeout(context.Background(), sudoTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(cmdCtx, "sudo", "-v")
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -180,10 +182,9 @@ func BindRFCOMMDevice(device, address string, channel int) error {
 		return err
 	}
 
-	args := []string{"bind", num, address, strconv.Itoa(channel)}
-	_, err = runCommand("rfcomm", args...)
-	if err == nil && waitForDevice(device, 1500*time.Millisecond) == nil {
-		if accessErr := EnsureRFCOMMDeviceAccess(device); accessErr != nil {
+	_, err = runCommand("rfcomm", "bind", num, address, strconv.Itoa(channel))
+	if err == nil && rfcommWaitForDevice(device, 1500*time.Millisecond) == nil {
+		if accessErr := rfcommEnsureAccess(device); accessErr != nil {
 			return wrapRFCOMMPermission(accessErr)
 		}
 		return nil
@@ -191,19 +192,9 @@ func BindRFCOMMDevice(device, address string, channel int) error {
 
 	plainErr := wrapRFCOMMBind(err)
 	if err == nil {
-		plainErr = wrapRFCOMMBind(fmt.Errorf("rfcomm %s returned success but %s was not created", strings.Join(args, " "), device))
+		plainErr = wrapRFCOMMBind(fmt.Errorf("rfcomm bind %s returned success but %s was not created", num, device))
 	}
-	if privErr := privilegedRFCCOMMBind(num, address, channel); privErr != nil {
-		return wrapRFCOMMBind(fmt.Errorf("%w; privileged fallback failed: %w", plainErr, privErr))
-	}
-	if err := waitForDevice(device, 3*time.Second); err != nil {
-		return wrapRFCOMMWait(fmt.Errorf("sudo rfcomm bind %s succeeded but %s was not created: %w", num, device, err))
-	}
-
-	if err := EnsureRFCOMMDeviceAccess(device); err != nil {
-		return wrapRFCOMMPermission(err)
-	}
-	return nil
+	return bindRFCOMMPrivileged(device, num, address, channel, plainErr)
 }
 
 // BindRFCOMMWithProbe binds an RFCOMM TTY, probing alternate channels when the
@@ -218,10 +209,10 @@ func BindRFCOMMWithProbe(device, address string, channel int, progress RFCOMMPro
 		if attempt > 0 {
 			_ = ReleaseRFCOMMDevice(device)
 		}
-		if err := BindRFCOMMDevice(device, address, ch); err != nil {
+		if err := rfcommBindDevice(device, address, ch); err != nil {
 			return err
 		}
-		f, err := openFileWithTimeout(device, 2*time.Second)
+		f, err := rfcommOpenFile(device, 2*time.Second)
 		if err != nil {
 			return err
 		}
@@ -245,12 +236,15 @@ func ReleaseRFCOMMDevice(device string) error {
 	if err != nil {
 		return err
 	}
+	return releaseRFCOMMNumber(num)
+}
 
+func releaseRFCOMMNumber(num string) error {
 	out, err := runCommand("rfcomm", "release", num)
 	if err == nil || isRFCOMMNotBoundOutput(string(out)) || isRFCOMMNotBoundError(err) {
 		return nil
 	}
-	if privErr := privilegedRFCOMMRelease(num); privErr != nil {
+	if privErr := rfcommPrivilegedRelease(num); privErr != nil {
 		if isRFCOMMNotBoundError(privErr) {
 			return nil
 		}
@@ -275,17 +269,17 @@ func ReviveRFCOMMDevice(device, address string, channel int, progress RFCOMMProg
 	if err := BindRFCOMMDevice(device, address, channel); err != nil {
 		return wrapRFCOMMRevive(fmt.Errorf("bind %q: %w", device, err))
 	}
-	if err := waitForDevice(device, 3*time.Second); err != nil {
+	if err := rfcommWaitForDevice(device, 3*time.Second); err != nil {
 		return wrapRFCOMMRevive(wrapRFCOMMWait(fmt.Errorf("wait for %q after bind: %w", device, err)))
 	}
 
 	report(progress, "granting RFCOMM device access")
-	if err := EnsureRFCOMMDeviceAccess(device); err != nil {
+	if err := rfcommEnsureAccess(device); err != nil {
 		return err
 	}
 
 	report(progress, "verifying RFCOMM device")
-	if _, err := openFileWithTimeout(device, 2*time.Second); err != nil {
+	if _, err := rfcommOpenFile(device, 2*time.Second); err != nil {
 		return wrapRFCOMMRevive(wrapRFCOMMOpen(fmt.Errorf("verify open %q: %w", device, err)))
 	}
 	return nil
@@ -310,11 +304,11 @@ func waitForDevice(device string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	var lastErr error
 	for time.Now().Before(deadline) {
-		if _, err := os.Stat(device); err == nil {
+		_, err := os.Stat(device)
+		if err == nil {
 			return nil
-		} else {
-			lastErr = err
 		}
+		lastErr = err
 		time.Sleep(100 * time.Millisecond)
 	}
 	if lastErr == nil {
@@ -328,7 +322,11 @@ func EnsureRFCOMMDeviceAccess(device string) error {
 	if err != nil {
 		return err
 	}
-	if f, err := os.OpenFile(device, os.O_RDWR, 0); err == nil {
+	openRFCOMM := ensureRFCOMMOpenHook
+	if openRFCOMM == nil {
+		openRFCOMM = os.OpenFile
+	}
+	if f, err := openRFCOMM(device, os.O_RDWR, 0); err == nil {
 		return f.Close()
 	}
 
@@ -338,11 +336,11 @@ func EnsureRFCOMMDeviceAccess(device string) error {
 	if err := privilegedEnsureRFCOMMAccess(device, uid+":"+gid); err != nil {
 		return err
 	}
-	if f, err := os.OpenFile(device, os.O_RDWR, 0); err == nil {
+	f, openErr := openRFCOMM(device, os.O_RDWR, 0)
+	if openErr == nil {
 		return f.Close()
-	} else {
-		return fmt.Errorf("open %q after chown/chmod: %w", device, err)
 	}
+	return fmt.Errorf("open %q after chown/chmod: %w", device, openErr)
 }
 
 func sudoRFCCOMMRelease(num string) error {
@@ -394,40 +392,63 @@ func sudoDeviceChmod(device string) error {
 // Errors are formatted uniformly via commandError with the original args
 // (sudo flags excluded). A successful run marks sudo as available.
 func execSudo(args ...string) error {
+	if execSudoHook != nil {
+		return execSudoHook(args...)
+	}
 	label := "sudo " + strings.Join(args, " ")
+	sudoCtx, cancel := context.WithTimeout(context.Background(), sudoTimeout)
+	defer cancel()
+	cmd, interactive, err := buildSudoCommand(sudoCtx, label, args)
+	if err != nil {
+		return err
+	}
+	if err := runSudoCommand(label, cmd, interactive, args); err != nil {
+		return err
+	}
+	markSudoAvailable()
+	return nil
+}
+
+func buildSudoCommand(ctx context.Context, label string, args []string) (*exec.Cmd, bool, error) {
 	var cmd *exec.Cmd
 	interactive := false
 	switch {
 	case SudoAvailable():
-		cmd = exec.Command("sudo", append([]string{"-n"}, args...)...)
+		cmd = exec.CommandContext(ctx, "sudo", append([]string{"-n"}, args...)...)
 	case sudoPasswordProvider() != nil:
 		password, err := sudoPasswordProvider()("Administrator password is required for " + label)
 		if err != nil {
-			return fmt.Errorf("%s: %w", label, err)
+			return nil, false, fmt.Errorf("%s: %w", label, err)
 		}
-		cmd = exec.Command("sudo", append([]string{"-S", "-p", ""}, args...)...)
+		cmd = exec.CommandContext(ctx, "sudo", append([]string{"-S", "-p", ""}, args...)...)
 		cmd.Stdin = bytes.NewBufferString(password + "\n")
 	default:
 		interactive = true
-		cmd = exec.Command("sudo", args...)
+		cmd = exec.CommandContext(ctx, "sudo", args...)
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	}
+	return cmd, interactive, nil
+}
 
+func runSudoCommand(label string, cmd *exec.Cmd, interactive bool, args []string) error {
 	if interactive {
-		if err := cmd.Run(); err != nil {
+		if err := execCmdRun(cmd); err != nil {
 			return fmt.Errorf("%s: %w", label, err)
 		}
-	} else if out, err := cmd.CombinedOutput(); err != nil {
+		return nil
+	}
+	if out, err := execCmdCombinedOutput(cmd); err != nil {
 		return commandError("sudo", args, out, err)
 	}
-	markSudoAvailable()
 	return nil
 }
 
 // runCommand executes an external command and returns its combined output.
 // On failure the error carries the full command line and trimmed output.
 func runCommand(name string, args ...string) ([]byte, error) {
-	out, err := exec.Command(name, args...).CombinedOutput()
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
+	defer cancel()
+	out, err := execCombinedOutput(ctx, name, args...)
 	if err != nil {
 		return out, commandError(name, args, out, err)
 	}
@@ -456,26 +477,33 @@ func isRFCOMMNotBoundError(err error) bool {
 	return isRFCOMMNotBoundOutput(err.Error())
 }
 
+func isRecoverableOpenMessage(msg string) bool {
+	return strings.Contains(msg, "timed out") ||
+		strings.Contains(msg, "input/output error") ||
+		strings.Contains(msg, "no such device") ||
+		strings.Contains(msg, "no such file or directory") ||
+		strings.Contains(msg, "device not configured")
+}
+
+func isRecoverableSyscallErr(err error) bool {
+	return errors.Is(err, syscall.EIO) ||
+		errors.Is(err, syscall.ENXIO) ||
+		errors.Is(err, syscall.ENODEV) ||
+		errors.Is(err, syscall.ENOTCONN)
+}
+
 func isRecoverableRFCOMMOpenError(err error) bool {
 	if err == nil {
 		return false
 	}
-	msg := strings.ToLower(err.Error())
-	if strings.Contains(msg, "timed out") ||
-		strings.Contains(msg, "input/output error") ||
-		strings.Contains(msg, "no such device") ||
-		strings.Contains(msg, "no such file or directory") ||
-		strings.Contains(msg, "device not configured") {
+	if isRecoverableOpenMessage(strings.ToLower(err.Error())) {
 		return true
 	}
 	var pathErr *os.PathError
 	if errors.As(err, &pathErr) {
 		err = pathErr.Err
 	}
-	return errors.Is(err, syscall.EIO) ||
-		errors.Is(err, syscall.ENXIO) ||
-		errors.Is(err, syscall.ENODEV) ||
-		errors.Is(err, syscall.ENOTCONN)
+	return isRecoverableSyscallErr(err)
 }
 
 // OpenTransport opens an RFCOMM tty, probing alternate channels when the
@@ -483,12 +511,20 @@ func isRecoverableRFCOMMOpenError(err error) bool {
 func OpenTransport(device, address string, channel int, progress RFCOMMProgress) (Transport, int, error) {
 	channel = ResolveDeviceChannel(address, channel)
 	if address == "" {
-		t, err := openRFCOMMOnChannel(device, address, channel, progress)
-		if err != nil {
-			return nil, channel, err
-		}
-		return newRWCTransport(t, "", channel, device), channel, nil
+		return openTransportWithoutAddress(device, address, channel, progress)
 	}
+	return openTransportWithAddress(device, address, channel, progress)
+}
+
+func openTransportWithoutAddress(device, address string, channel int, progress RFCOMMProgress) (Transport, int, error) {
+	t, err := openRFCOMMOnChannel(device, address, channel, progress)
+	if err != nil {
+		return nil, channel, err
+	}
+	return newRWCTransport(t, "", channel, device), channel, nil
+}
+
+func openTransportWithAddress(device, address string, channel int, progress RFCOMMProgress) (Transport, int, error) {
 	var opened *os.File
 	usedChannel, err := probeRFCOMMChannels(channel, progress, "trying", func(ch, attempt int) error {
 		if attempt > 0 {
@@ -515,64 +551,32 @@ func OpenTransport(device, address string, channel int, progress RFCOMMProgress)
 }
 
 func openRFCOMMOnChannel(device, address string, channel int, progress RFCOMMProgress) (*os.File, error) {
-	devPath, err := security.ValidateRFCOMMDevice(device)
+	device, address, channel, err := validateOpenRFCOMMParams(device, address, channel)
 	if err != nil {
 		return nil, err
 	}
-	if address != "" {
-		if address, err = security.NormalizeMAC(address); err != nil {
-			return nil, err
-		}
-	}
-	if err := security.ValidateChannel(channel); err != nil {
-		return nil, err
-	}
-	device = devPath
 
-	f, err := openFileWithTimeout(device, 5*time.Second)
+	f, err := rfcommOpenFile(device, 5*time.Second)
 	if err == nil {
 		return f, nil
 	}
 	if os.IsPermission(err) {
-		report(progress, "fixing RFCOMM permissions")
-		if accessErr := EnsureRFCOMMDeviceAccess(device); accessErr != nil {
-			return nil, wrapRFCOMMPermission(accessErr)
-		}
-		f, retryErr := openFileWithTimeout(device, 5*time.Second)
-		if retryErr != nil {
-			return nil, wrapRFCOMMOpen(retryErr)
-		}
-		return f, nil
+		return openRFCOMMAfterPermissionFix(device, progress)
 	}
 	if isRecoverableRFCOMMOpenError(err) && address != "" {
-		report(progress, "recovering stale RFCOMM device")
-		if reviveErr := ReviveRFCOMMDevice(device, address, channel, progress); reviveErr != nil {
-			return nil, wrapRFCOMMRevive(fmt.Errorf("open %q: %w; revive failed: %w", device, err, reviveErr))
-		}
-		f, retryErr := openFileWithTimeout(device, 5*time.Second)
-		if retryErr != nil {
-			return nil, wrapRFCOMMOpen(fmt.Errorf("open %q after revive: %w", device, retryErr))
-		}
-		return f, nil
+		return openRFCOMMAfterRevive(device, address, channel, progress, err)
 	}
+	return openRFCOMMOnMissingDevice(device, address, channel, progress, err)
+}
+
+func openRFCOMMOnMissingDevice(device, address string, channel int, progress RFCOMMProgress, err error) (*os.File, error) {
 	if !os.IsNotExist(err) {
 		return nil, wrapRFCOMMOpen(fmt.Errorf("open %q: %w", device, err))
 	}
 	if address == "" {
 		return nil, wrapRFCOMMOpen(fmt.Errorf("device %q does not exist; pass --addr or choose a device", device))
 	}
-	report(progress, "creating RFCOMM device")
-	if err := BindRFCOMMDevice(device, address, channel); err != nil {
-		return nil, wrapRFCOMMBind(fmt.Errorf("create %q: %w", device, err))
-	}
-	if err := waitForDevice(device, 2*time.Second); err != nil {
-		return nil, wrapRFCOMMWait(fmt.Errorf("wait for %q after rfcomm bind: %w", device, err))
-	}
-	f, err = openFileWithTimeout(device, 5*time.Second)
-	if err != nil {
-		return nil, wrapRFCOMMOpen(fmt.Errorf("open %q after rfcomm bind: %w", device, err))
-	}
-	return f, nil
+	return createBindAndOpenRFCOMM(device, address, channel, progress)
 }
 
 // openFileWithTimeout opens an RFCOMM tty without ever blocking the caller.
@@ -588,24 +592,11 @@ func openFileWithTimeout(device string, timeout time.Duration) (*os.File, error)
 		return nil, &os.PathError{Op: "open", Path: device, Err: err}
 	}
 
-	deadline := time.Now().Add(timeout)
-	for {
-		bits, err := unix.IoctlGetInt(fd, unix.TIOCMGET)
-		if err != nil {
-			// Not a tty (regular file/pipe in tests): nothing to wait for.
-			break
-		}
-		if bits&unix.TIOCM_CD != 0 {
-			break
-		}
-		if time.Now().After(deadline) {
-			_ = unix.Close(fd)
-			return nil, wrapRFCOMMOpen(fmt.Errorf("open %q timed out after %s", device, timeout))
-		}
-		time.Sleep(50 * time.Millisecond)
+	if err := waitRFCOMMCarrier(fd, device, timeout); err != nil {
+		_ = unix.Close(fd)
+		return nil, err
 	}
 
-	// Restore blocking mode for the session read loop.
 	if err := unix.SetNonblock(fd, false); err != nil {
 		_ = unix.Close(fd)
 		return nil, &os.PathError{Op: "open", Path: device, Err: err}
@@ -613,6 +604,17 @@ func openFileWithTimeout(device string, timeout time.Duration) (*os.File, error)
 	f := os.NewFile(uintptr(fd), device)
 	setRawMode(f)
 	return f, nil
+}
+
+func waitRFCOMMCarrier(fd int, device string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if bits, err := unix.IoctlGetInt(fd, unix.TIOCMGET); err != nil || bits&unix.TIOCM_CD != 0 {
+			return nil
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return wrapRFCOMMOpen(fmt.Errorf("open %q timed out after %s", device, timeout))
 }
 
 // setRawMode puts an RFCOMM tty into raw mode so binary SPP frames are passed

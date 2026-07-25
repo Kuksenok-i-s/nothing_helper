@@ -17,7 +17,7 @@ func TestLoggerCollectsCRCSamples(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewLogger() error = %v", err)
 	}
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 	pkt := spp.Packet{Cmd: spp.CmdGetBattery}
 	tr.LogTX([]byte{0x55, 0x60, 0x01, 0x01, 0xc0, 0x07, 0x00, 0x00, 0x00, 0xe9, 0xbf}, pkt, Context{})
 	var out strings.Builder
@@ -70,10 +70,66 @@ func TestLoggerLoadsExistingCRCSamples(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewLogger() error = %v", err)
 	}
-	defer tr.Close()
+	defer func() { _ = tr.Close() }()
 	var out strings.Builder
 	tr.PrintCRCSamples(&out)
 	if got := out.String(); !strings.Contains(got, "5560010140060000312e302e300a b896") {
 		t.Fatalf("crc samples = %q, want loaded sample", got)
 	}
+}
+
+func TestExportWritesJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sub", "out.json")
+	events := []Event{{Direction: "tx", Summary: "sent", RawHex: "0102"}}
+	if err := Export(path, events, "note", false); err != nil {
+		t.Fatalf("Export() = %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"comment": "note"`) {
+		t.Fatalf("export = %s", data)
+	}
+}
+
+func TestExportWithRaw(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.json")
+	events := []Event{{Direction: "tx", Summary: "sent", RawHex: "01"}}
+	if err := Export(path, events, "", true); err != nil {
+		t.Fatalf("Export() = %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"raw_hex": "01"`) {
+		t.Fatalf("export = %s", data)
+	}
+}
+
+func TestLogEventDirect(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trace.ndjson")
+	tr, err := NewLogger(path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tr.Close() }()
+
+	tr.LogEvent(Event{Direction: "event", Summary: "connected"})
+	tr.LogEvent(Event{
+		Direction: "rx",
+		RawHex:    "55600101c007000000e9bf",
+		Summary:   "battery",
+	})
+	var out strings.Builder
+	tr.PrintCRCSamples(&out)
+	if !strings.Contains(out.String(), "e9bf") {
+		t.Fatalf("samples=%q", out.String())
+	}
+}
+
+func TestLogEventNilLogger(t *testing.T) {
+	var tr *Logger
+	tr.LogEvent(Event{Summary: "noop"})
 }
