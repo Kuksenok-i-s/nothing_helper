@@ -77,7 +77,7 @@ func darwinMenuLoop(ctx context.Context, s *session.Session, opts Options, menuC
 				if opts.OnQuit != nil {
 					opts.OnQuit()
 				} else {
-					_ = s.Close()
+					go func() { _ = s.Close() }()
 				}
 				return
 			}

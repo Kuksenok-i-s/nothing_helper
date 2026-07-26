@@ -60,8 +60,9 @@ func Run(ctx context.Context, cfg Config, fn func(context.Context, *Runtime) err
 	}
 
 	// WithoutCancel keeps request-scoped values while allowing shutdown after
-	// the run context is cancelled.
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	// the run context is cancelled. Keep this short: Session.Close already
+	// time-bounds RFCOMM teardown; we only need a moment for the logger flush.
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer shutdownCancel()
 
 	var once sync.Once

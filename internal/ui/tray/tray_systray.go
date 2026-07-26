@@ -51,7 +51,7 @@ func onReady(ctx context.Context, s *session.Session, opts Options) {
 		for {
 			select {
 			case <-ctx.Done():
-				_ = s.Close()
+				// Quit the tray loop first; session teardown belongs to app.Shutdown.
 				systray.Quit()
 				return
 			case <-showWindow.ClickedCh:
@@ -70,9 +70,11 @@ func onReady(ctx context.Context, s *session.Session, opts Options) {
 				if opts.OnQuit != nil {
 					opts.OnQuit()
 				} else {
-					_ = s.Close()
-					systray.Quit()
+					// CLI tray has no OnQuit: drop the link in the background
+					// so systray.Quit is not blocked by RFCOMM teardown.
+					go func() { _ = s.Close() }()
 				}
+				systray.Quit()
 				return
 			}
 		}

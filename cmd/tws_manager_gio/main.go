@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"tws_manager/internal/app"
 	"tws_manager/internal/bt"
@@ -84,7 +85,11 @@ func run(ctx context.Context, rt *app.Runtime, stop context.CancelFunc) error {
 		PCPrimary:     services.PCPrimaryMode,
 		HideToTray:    hideToTray(),
 		ShowCh:        showCh,
-		OnQuit:        func() { _ = rt.Shutdown(context.Background()) },
+		OnQuit: func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_ = rt.Shutdown(shutdownCtx)
+		},
 	})
 }
 

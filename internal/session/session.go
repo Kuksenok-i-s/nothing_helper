@@ -70,6 +70,10 @@ const (
 	probeConfigStep    = 400 * time.Millisecond
 )
 
+// transportCloseTimeout caps how long Session.Close waits on RFCOMM teardown.
+// Kernel RFCOMM close can block for seconds; quit paths must stay snappy.
+var transportCloseTimeout = 400 * time.Millisecond
+
 var probeSleep = time.Sleep
 
 type pendingTX struct {
@@ -308,10 +312,7 @@ func (s *Session) installConnectTransport(device bt.Device, transportRef string,
 
 func (s *Session) swapConnectTransport(device bt.Device, transport bt.Transport, usedChannel int) (*trace.Event, string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.transport != nil {
-		_ = s.transport.Close()
-	}
+	old := s.transport
 	s.transport = transport
 	device.Channel = usedChannel
 	s.device = device
@@ -321,7 +322,10 @@ func (s *Session) swapConnectTransport(device bt.Device, transport bt.Transport,
 		_ = s.rawCapture.Close()
 		s.rawCapture = nil
 	}
-	return modelEvent, s.openRawCaptureLocked()
+	rawPath := s.openRawCaptureLocked()
+	s.mu.Unlock()
+	_ = closeCloserWithTimeout(old, transportCloseTimeout)
+	return modelEvent, rawPath
 }
 
 func (s *Session) initialProbe(device bt.Device) {
@@ -434,6 +438,9 @@ func (s *Session) afterDelay(d time.Duration, fn func()) {
 		t := time.NewTimer(d)
 		defer t.Stop()
 		<-t.C
+		if !s.Snapshot().Connected {
+			return
+		}
 		fn()
 	}()
 }
@@ -473,24 +480,49 @@ func (s *Session) finalizeDisconnect(transport bt.Transport, source, trigger str
 
 func (s *Session) closeActiveTransport(transport bt.Transport) (wasConnected bool, dev bt.Device, closeErr error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if transport != nil && s.transport != transport {
+		s.mu.Unlock()
 		return false, bt.Device{}, nil
 	}
 	wasConnected = s.transport != nil
 	dev = s.device
-	if s.transport != nil {
-		closeErr = s.transport.Close()
-		s.transport = nil
-	}
-	if s.rawCapture != nil {
-		_ = s.rawCapture.Close()
-		s.rawCapture = nil
-	}
+	active := s.transport
+	s.transport = nil
+	rawCapture := s.rawCapture
+	s.rawCapture = nil
 	if wasConnected {
 		s.clearLiveStateLocked()
 	}
+	s.mu.Unlock()
+
+	// Close I/O outside the session mutex so a stuck RFCOMM close cannot
+	// freeze Snapshot/Send/readLoop bookkeeping during quit.
+	closeErr = closeCloserWithTimeout(active, transportCloseTimeout)
+	if rawCapture != nil {
+		_ = rawCapture.Close()
+	}
 	return wasConnected, dev, closeErr
+}
+
+func closeCloserWithTimeout(c io.Closer, d time.Duration) error {
+	if c == nil {
+		return nil
+	}
+	if d <= 0 {
+		return c.Close()
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- c.Close()
+	}()
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case err := <-done:
+		return err
+	case <-timer.C:
+		return fmt.Errorf("close timed out after %s", d)
+	}
 }
 
 func (s *Session) SendCommand(cmd uint16, meta Meta) error {

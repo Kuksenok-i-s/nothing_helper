@@ -61,7 +61,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c", "q":
-		_ = m.session.Close()
+		// Do not Close here — RFCOMM teardown can block. Run's defer and
+		// app.Shutdown close the session after the UI exits.
 		return m, tea.Quit
 	case "tab":
 		m.activeTab = (m.activeTab + 1) % 3
