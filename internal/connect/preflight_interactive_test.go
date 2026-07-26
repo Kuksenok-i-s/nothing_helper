@@ -18,7 +18,7 @@ func TestReportAutoConnectErr(t *testing.T) {
 		want string
 	}{
 		{name: "bluetooth", err: errWaitingForBluetooth, want: "Bluetooth disconnected"},
-		{name: "audio", err: errWaitingForAudioOutput, want: "audio output"},
+		{name: "audio", err: errWaitingForAudioOutput, want: "A2DP"},
 		{name: "none", err: errNoCandidate, want: "no compatible TWS device found"},
 		{name: "other", err: errors.New("other"), want: ""},
 	}

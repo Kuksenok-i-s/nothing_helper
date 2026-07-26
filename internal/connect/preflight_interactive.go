@@ -215,7 +215,7 @@ func reportAutoConnectErr(report func(string), err error) {
 	case errors.Is(err, errWaitingForBluetooth):
 		report("auto: waiting for headphones (Bluetooth disconnected)")
 	case errors.Is(err, errWaitingForAudioOutput):
-		report("auto: waiting for headphones to become audio output")
+		report("auto: waiting for bluetooth audio profile (A2DP)")
 	case errors.Is(err, errNoCandidate):
 		report("auto: no compatible TWS device found")
 	}

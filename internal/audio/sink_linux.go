@@ -32,6 +32,27 @@ func IsDefaultOutputForMAC(ctx context.Context, mac string) (bool, error) {
 	return strings.HasPrefix(sink, prefix), nil
 }
 
+// HasBluetoothOutputForMAC reports whether Pulse/PipeWire exposes a bluez_output
+// sink for the device. The buds need not be the system default — only available
+// as an audio endpoint (typical once A2DP is up).
+func HasBluetoothOutputForMAC(ctx context.Context, mac string) (bool, error) {
+	prefix, err := sinkPrefixForMAC(mac)
+	if err != nil {
+		return false, err
+	}
+	sinks, err := listPlaybackSinks(ctx)
+	if err != nil {
+		// If we cannot enumerate sinks, do not block RFCOMM when BT is connected.
+		return true, nil
+	}
+	for _, sink := range sinks {
+		if strings.HasPrefix(sink, prefix) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func sinkPrefixForMAC(mac string) (string, error) {
 	norm, err := security.NormalizeMAC(mac)
 	if err != nil {
@@ -48,6 +69,31 @@ func defaultPlaybackSink(ctx context.Context) string {
 		return sink
 	}
 	return ""
+}
+
+func listPlaybackSinks(ctx context.Context) ([]string, error) {
+	if sinks, err := pactlListSinks(ctx); err == nil {
+		return sinks, nil
+	}
+	return nil, fmt.Errorf("no sink list backend available")
+}
+
+func pactlListSinks(ctx context.Context) ([]string, error) {
+	if _, err := execLookPath("pactl"); err != nil {
+		return nil, err
+	}
+	out, err := execCommandOutput(ctx, "pactl", "list", "short", "sinks")
+	if err != nil {
+		return nil, fmt.Errorf("pactl list short sinks: %w", err)
+	}
+	var sinks []string
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			sinks = append(sinks, fields[1])
+		}
+	}
+	return sinks, nil
 }
 
 func pactlDefaultSink(ctx context.Context) (string, error) {

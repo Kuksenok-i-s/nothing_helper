@@ -26,9 +26,9 @@ type autoTestHooks struct {
 var autoTestHooksVar *autoTestHooks
 
 var (
-	hookIsDeviceConnected    = bt.IsDeviceConnected
-	hookIsDefaultAudioOutput = audio.IsDefaultOutputForMAC
-	hookReleaseRFCOMMDevice  = bt.ReleaseRFCOMMDevice
+	hookIsDeviceConnected     = bt.IsDeviceConnected
+	hookHasBluetoothAudioSink = audio.HasBluetoothOutputForMAC
+	hookReleaseRFCOMMDevice   = bt.ReleaseRFCOMMDevice
 )
 
 // AutoOptions tunes the auto-discovery loop.
@@ -279,11 +279,13 @@ func (m *Manager) requireRFCOMMReady(ctx context.Context, mac string) error {
 	if !connected {
 		return errWaitingForBluetooth
 	}
-	isOutput, err := hookIsDefaultAudioOutput(ctx, mac)
+	// Require a bluez playback sink for the MAC (A2DP up). Do not require the
+	// buds to be the system *default* sink — users often keep speakers as default.
+	hasSink, err := hookHasBluetoothAudioSink(ctx, mac)
 	if err != nil {
 		return err
 	}
-	if !isOutput {
+	if !hasSink {
 		return errWaitingForAudioOutput
 	}
 	return nil

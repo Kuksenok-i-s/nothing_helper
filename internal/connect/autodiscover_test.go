@@ -62,12 +62,12 @@ func TestConnectViaExisting(t *testing.T) {
 	t.Cleanup(func() { autoTestHooksVar = nil })
 
 	oldConnected := hookIsDeviceConnected
-	oldOutput := hookIsDefaultAudioOutput
+	oldOutput := hookHasBluetoothAudioSink
 	hookIsDeviceConnected = func(string) (bool, error) { return true, nil }
-	hookIsDefaultAudioOutput = func(context.Context, string) (bool, error) { return true, nil }
+	hookHasBluetoothAudioSink = func(context.Context, string) (bool, error) { return true, nil }
 	t.Cleanup(func() {
 		hookIsDeviceConnected = oldConnected
-		hookIsDefaultAudioOutput = oldOutput
+		hookHasBluetoothAudioSink = oldOutput
 	})
 
 	var statuses []string
@@ -126,12 +126,12 @@ func TestConnectBestExistingRFCOMMNoMAC(t *testing.T) {
 	t.Cleanup(func() { autoTestHooksVar = nil })
 
 	oldConnected := hookIsDeviceConnected
-	oldOutput := hookIsDefaultAudioOutput
+	oldOutput := hookHasBluetoothAudioSink
 	hookIsDeviceConnected = func(string) (bool, error) { return true, nil }
-	hookIsDefaultAudioOutput = func(context.Context, string) (bool, error) { return true, nil }
+	hookHasBluetoothAudioSink = func(context.Context, string) (bool, error) { return true, nil }
 	t.Cleanup(func() {
 		hookIsDeviceConnected = oldConnected
-		hookIsDefaultAudioOutput = oldOutput
+		hookHasBluetoothAudioSink = oldOutput
 	})
 
 	if err := mgr.ConnectBest(context.Background(), nil); err != nil {
@@ -164,16 +164,16 @@ func TestConnectBestExistingStaleMACRescans(t *testing.T) {
 	t.Cleanup(func() { autoTestHooksVar = nil })
 
 	oldConnected := hookIsDeviceConnected
-	oldOutput := hookIsDefaultAudioOutput
+	oldOutput := hookHasBluetoothAudioSink
 	hookIsDeviceConnected = func(mac string) (bool, error) {
 		return mac == live, nil
 	}
-	hookIsDefaultAudioOutput = func(_ context.Context, mac string) (bool, error) {
+	hookHasBluetoothAudioSink = func(_ context.Context, mac string) (bool, error) {
 		return mac == live, nil
 	}
 	t.Cleanup(func() {
 		hookIsDeviceConnected = oldConnected
-		hookIsDefaultAudioOutput = oldOutput
+		hookHasBluetoothAudioSink = oldOutput
 	})
 
 	var statuses []string
@@ -207,12 +207,12 @@ func TestConnectBestDiscoverAndBind(t *testing.T) {
 	t.Cleanup(func() { autoTestHooksVar = nil })
 
 	oldConnected := hookIsDeviceConnected
-	oldOutput := hookIsDefaultAudioOutput
+	oldOutput := hookHasBluetoothAudioSink
 	hookIsDeviceConnected = func(string) (bool, error) { return true, nil }
-	hookIsDefaultAudioOutput = func(context.Context, string) (bool, error) { return true, nil }
+	hookHasBluetoothAudioSink = func(context.Context, string) (bool, error) { return true, nil }
 	t.Cleanup(func() {
 		hookIsDeviceConnected = oldConnected
-		hookIsDefaultAudioOutput = oldOutput
+		hookHasBluetoothAudioSink = oldOutput
 	})
 
 	if err := mgr.ConnectBest(context.Background(), nil); err != nil {
@@ -264,12 +264,12 @@ func TestConnectBestReadinessWaits(t *testing.T) {
 	t.Cleanup(func() { autoTestHooksVar = nil })
 
 	oldConnected := hookIsDeviceConnected
-	oldOutput := hookIsDefaultAudioOutput
+	oldOutput := hookHasBluetoothAudioSink
 	hookIsDeviceConnected = func(string) (bool, error) { return false, nil }
-	hookIsDefaultAudioOutput = func(context.Context, string) (bool, error) { return true, nil }
+	hookHasBluetoothAudioSink = func(context.Context, string) (bool, error) { return true, nil }
 	t.Cleanup(func() {
 		hookIsDeviceConnected = oldConnected
-		hookIsDefaultAudioOutput = oldOutput
+		hookHasBluetoothAudioSink = oldOutput
 	})
 
 	err := mgr.ConnectBest(context.Background(), nil)
@@ -278,7 +278,7 @@ func TestConnectBestReadinessWaits(t *testing.T) {
 	}
 
 	hookIsDeviceConnected = func(string) (bool, error) { return true, nil }
-	hookIsDefaultAudioOutput = func(context.Context, string) (bool, error) { return false, nil }
+	hookHasBluetoothAudioSink = func(context.Context, string) (bool, error) { return false, nil }
 	err = mgr.ConnectBest(context.Background(), nil)
 	if !errors.Is(err, errWaitingForAudioOutput) {
 		t.Fatalf("ConnectBest() = %v, want errWaitingForAudioOutput", err)
@@ -330,12 +330,12 @@ func TestConnectBestRebindExistingRFCOMM(t *testing.T) {
 	t.Cleanup(func() { autoTestHooksVar = nil })
 
 	oldConnected := hookIsDeviceConnected
-	oldOutput := hookIsDefaultAudioOutput
+	oldOutput := hookHasBluetoothAudioSink
 	hookIsDeviceConnected = func(string) (bool, error) { return true, nil }
-	hookIsDefaultAudioOutput = func(context.Context, string) (bool, error) { return true, nil }
+	hookHasBluetoothAudioSink = func(context.Context, string) (bool, error) { return true, nil }
 	t.Cleanup(func() {
 		hookIsDeviceConnected = oldConnected
-		hookIsDefaultAudioOutput = oldOutput
+		hookHasBluetoothAudioSink = oldOutput
 	})
 
 	if err := mgr.ConnectBest(context.Background(), nil); err != nil {
@@ -408,11 +408,11 @@ func TestAutoConnectWaitingStatusMessages(t *testing.T) {
 	tests := []struct {
 		name            string
 		deviceConnected bool
-		defaultOutput   bool
+		hasAudioSink    bool
 		want            string
 	}{
-		{name: "bluetooth", deviceConnected: false, defaultOutput: true, want: "Bluetooth disconnected"},
-		{name: "audio", deviceConnected: true, defaultOutput: false, want: "audio output"},
+		{name: "bluetooth", deviceConnected: false, hasAudioSink: true, want: "Bluetooth disconnected"},
+		{name: "audio", deviceConnected: true, hasAudioSink: false, want: "A2DP"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -427,13 +427,13 @@ func TestAutoConnectWaitingStatusMessages(t *testing.T) {
 				},
 			}
 			oldConnected := hookIsDeviceConnected
-			oldOutput := hookIsDefaultAudioOutput
+			oldOutput := hookHasBluetoothAudioSink
 			hookIsDeviceConnected = func(string) (bool, error) { return tt.deviceConnected, nil }
-			hookIsDefaultAudioOutput = func(context.Context, string) (bool, error) { return tt.defaultOutput, nil }
+			hookHasBluetoothAudioSink = func(context.Context, string) (bool, error) { return tt.hasAudioSink, nil }
 			t.Cleanup(func() {
 				autoTestHooksVar = nil
 				hookIsDeviceConnected = oldConnected
-				hookIsDefaultAudioOutput = oldOutput
+				hookHasBluetoothAudioSink = oldOutput
 				cancel()
 			})
 

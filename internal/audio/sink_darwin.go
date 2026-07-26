@@ -11,3 +11,8 @@ func IsDefaultOutputForMAC(ctx context.Context, mac string) (bool, error) {
 	_ = mac
 	return true, nil
 }
+
+// HasBluetoothOutputForMAC on macOS always returns true (same rationale as IsDefaultOutputForMAC).
+func HasBluetoothOutputForMAC(ctx context.Context, mac string) (bool, error) {
+	return IsDefaultOutputForMAC(ctx, mac)
+}

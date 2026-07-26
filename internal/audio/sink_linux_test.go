@@ -128,8 +128,8 @@ func TestIsDefaultOutputForMAC(t *testing.T) {
 		}
 		return "", errors.New("missing")
 	}
-	execCommandOutput = func(_ context.Context, name string, _ ...string) ([]byte, error) {
-		if name == "pactl" {
+	execCommandOutput = func(_ context.Context, name string, args ...string) ([]byte, error) {
+		if name == "pactl" && len(args) == 1 && args[0] == "get-default-sink" {
 			return []byte("bluez_output.2C_BE_EE_4A_EC_9E.1\n"), nil
 		}
 		return nil, errors.New("unexpected")
@@ -137,5 +137,55 @@ func TestIsDefaultOutputForMAC(t *testing.T) {
 	ok, err := IsDefaultOutputForMAC(context.Background(), "2c:be:ee:4a:ec:9e")
 	if err != nil || !ok {
 		t.Fatalf("IsDefaultOutputForMAC() = %v, %v", ok, err)
+	}
+}
+
+func TestHasBluetoothOutputForMACFindsNonDefaultSink(t *testing.T) {
+	oldLook := execLookPath
+	oldOut := execCommandOutput
+	t.Cleanup(func() {
+		execLookPath = oldLook
+		execCommandOutput = oldOut
+	})
+	execLookPath = func(name string) (string, error) {
+		if name == "pactl" {
+			return "/usr/bin/pactl", nil
+		}
+		return "", errors.New("missing")
+	}
+	execCommandOutput = func(_ context.Context, name string, args ...string) ([]byte, error) {
+		if name == "pactl" && len(args) >= 1 && args[0] == "list" {
+			return []byte("71\talsa_output.pci.iec958-stereo\tPipeWire\ns16le\n3869\tbluez_output.2C_BE_EE_4A_EC_9E.1\tPipeWire\n"), nil
+		}
+		return nil, errors.New("unexpected")
+	}
+	ok, err := HasBluetoothOutputForMAC(context.Background(), "2c:be:ee:4a:ec:9e")
+	if err != nil || !ok {
+		t.Fatalf("HasBluetoothOutputForMAC() = %v, %v; want true (non-default bluez sink)", ok, err)
+	}
+}
+
+func TestHasBluetoothOutputForMACMissing(t *testing.T) {
+	oldLook := execLookPath
+	oldOut := execCommandOutput
+	t.Cleanup(func() {
+		execLookPath = oldLook
+		execCommandOutput = oldOut
+	})
+	execLookPath = func(name string) (string, error) {
+		if name == "pactl" {
+			return "/usr/bin/pactl", nil
+		}
+		return "", errors.New("missing")
+	}
+	execCommandOutput = func(_ context.Context, name string, args ...string) ([]byte, error) {
+		if name == "pactl" && len(args) >= 1 && args[0] == "list" {
+			return []byte("71\talsa_output.pci.iec958-stereo\tPipeWire\n"), nil
+		}
+		return nil, errors.New("unexpected")
+	}
+	ok, err := HasBluetoothOutputForMAC(context.Background(), "2c:be:ee:4a:ec:9e")
+	if err != nil || ok {
+		t.Fatalf("HasBluetoothOutputForMAC() = %v, %v; want false", ok, err)
 	}
 }

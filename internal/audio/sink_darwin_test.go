@@ -15,4 +15,8 @@ func TestIsDefaultOutputForMACDarwinSkipsGate(t *testing.T) {
 	if !ok {
 		t.Fatal("darwin should skip audio-output gate for RFCOMM connect")
 	}
+	ok, err = HasBluetoothOutputForMAC(context.Background(), "aa:bb:cc:dd:ee:ff")
+	if err != nil || !ok {
+		t.Fatalf("HasBluetoothOutputForMAC() = %v, %v", ok, err)
+	}
 }
