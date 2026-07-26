@@ -1,12 +1,16 @@
 English · **[Русская версия](README_RU.md)**
 
-# Client for controlling Nothing earbuds
+# Client for Nothing earbuds (community)
+
+Built for **Nothing** / **CMF** owners who want local control without the official phone app: battery, ANC, EQ, dual connection, and more over the device SPP protocol.
 
 ### It probably works with all supported models, but there is no absolute guarantee - bug reports are welcome
 
 # tws_manager - Go SPP client
 
 CLI/TUI and GUI client for **Nothing** and **CMF** earbuds and headsets over Bluetooth RFCOMM (SPP). Reads battery, status, ANC/EQ/spatial/dual, logs packets, and lets you explore the protocol safely without the official app.
+
+**Scope:** Nothing Ear / CMF Buds family (and close SPP-compatible variants). Other brands are out of scope.
 
 This project is not affiliated with Nothing Technology Limited. Nothing/CMF names and related trademarks belong to their respective owners and are used here only to describe compatibility.
 
