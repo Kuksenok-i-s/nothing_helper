@@ -2,7 +2,7 @@ package session
 
 import (
 	"errors"
-	"os"
+	"net"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -122,10 +122,11 @@ func TestConnectOpenTransportFailure(t *testing.T) {
 
 func TestConnectSuccessViaHookedTransport(t *testing.T) {
 	s := New(nil, false, false)
-	f, err := os.CreateTemp(t.TempDir(), "rfcomm")
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Keep the peer open until the assertions finish: an empty file returns EOF
+	// immediately and races the read loop's disconnect against Snapshot.
+	f, peer := net.Pipe()
+	t.Cleanup(func() { _ = peer.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 
 	old := hookOpenTransport
 	hookOpenTransport = func(string, string, int, bt.RFCOMMProgress) (bt.Transport, int, error) {
@@ -133,7 +134,7 @@ func TestConnectSuccessViaHookedTransport(t *testing.T) {
 	}
 	t.Cleanup(func() { hookOpenTransport = old })
 
-	err = s.Connect(bt.Device{MAC: "aa:bb:cc:dd:ee:ff", Name: "Ear"}, testTransportRef(), 15)
+	err := s.Connect(bt.Device{MAC: "aa:bb:cc:dd:ee:ff", Name: "Ear"}, testTransportRef(), 15)
 	if err != nil {
 		t.Fatalf("Connect() = %v", err)
 	}
@@ -145,7 +146,6 @@ func TestConnectSuccessViaHookedTransport(t *testing.T) {
 	if snap.Device.MAC != want {
 		t.Fatalf("device MAC = %q, want %q", snap.Device.MAC, want)
 	}
-	_ = s.Close()
 }
 
 func testTransportRef() string {
