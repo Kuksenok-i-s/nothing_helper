@@ -15,13 +15,13 @@ gofmt -w cmd internal && make test         # format + tests
 
 | Tag | Effect |
 |-----|--------|
-| `gio` | Gio GUI (`cmd/tws_manager_gio`, `internal/ui/gio/...`) |
+| `gio` | Gio GUI (`cmd/tws_manager`, `internal/ui/companion/...`) |
 | `systray` | Real tray (`internal/ui/tray/tray_systray.go`) vs no-op stub |
 
 ## Make targets
 
 ```bash
-make run                              # TUI
+make run                              # compact GUI
 make run-gio                          # Gio + systray
 make run-gio-lite                     # Gio without tray
 make build-helper                     # polkit helper binary
@@ -37,7 +37,7 @@ Requires **Go 1.26+**, BlueZ, Linux. Gio needs `vulkan-headers`; tray needs `lib
 
 ```bash
 # macOS — Gio GUI
-go build -tags "gio systray" -o bin/tws_manager_gio ./cmd/tws_manager_gio
+go build -tags "gio systray" -o bin/tws_manager ./cmd/tws_manager
 ./packaging/macos/bundle.sh && open dist/tws_manager.app
 
 # macOS — full release-style bundle + DMG

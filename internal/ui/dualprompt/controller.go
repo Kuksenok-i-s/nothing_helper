@@ -2,6 +2,7 @@ package dualprompt
 
 import (
 	"fmt"
+	"strings"
 
 	"tws_manager/internal/dualpolicy"
 	"tws_manager/internal/session"
@@ -18,6 +19,7 @@ type Controller struct {
 	PendingOK  bool
 	Visible    bool
 	Interacted bool
+	dismissed  map[string]bool
 }
 
 func (c *Controller) OnDisconnected() {
@@ -25,6 +27,7 @@ func (c *Controller) OnDisconnected() {
 	c.Visible = false
 	c.Pending = spp.DualDevice{}
 	c.Interacted = false
+	c.dismissed = nil
 }
 
 func (c *Controller) EnsureHostMAC() {
@@ -56,21 +59,25 @@ func (c *Controller) OnSnapshot(snap session.Snapshot) (status string) {
 	}
 	c.Pending = phone
 	c.PendingOK = true
-	if c.Interacted {
-		c.Visible = true
-	}
+	c.Visible = c.Interacted && !c.dismissed[strings.ToUpper(c.Pending.MAC)]
 	return ""
 }
 
 func (c *Controller) OnInteraction() {
 	c.Interacted = true
-	if c.PendingOK {
+	if c.PendingOK && !c.dismissed[strings.ToUpper(c.Pending.MAC)] {
 		c.Visible = true
 	}
 }
 
 func (c *Controller) Decline() {
 	c.Visible = false
+	if c.PendingOK {
+		if c.dismissed == nil {
+			c.dismissed = make(map[string]bool)
+		}
+		c.dismissed[strings.ToUpper(c.Pending.MAC)] = true
+	}
 }
 
 func (c *Controller) AcceptFields() ([]string, error) {
@@ -80,7 +87,7 @@ func (c *Controller) AcceptFields() ([]string, error) {
 		}
 		return nil, fmt.Errorf("host bluetooth MAC unavailable")
 	}
-	c.Visible = false
+	c.Decline()
 	return []string{"dual", "connect", c.HostMAC}, nil
 }
 

@@ -98,6 +98,9 @@ func matchModelByProductSubstring(values []string) (ModelInfo, string, bool) {
 }
 
 func ModelSupportsFeature(model ModelInfo, feature string) bool {
+	if feature == "walkie-talkie" || feature == "super-mic" {
+		return model.Codename == "EarThree"
+	}
 	if model.Codename == "" {
 		return true
 	}

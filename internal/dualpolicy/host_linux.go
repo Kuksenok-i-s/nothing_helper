@@ -16,13 +16,6 @@ var execCombinedOutput = func(ctx context.Context, name string, args ...string) 
 	return exec.CommandContext(ctx, name, args...).CombinedOutput()
 }
 
-var hostAdapterMACHook func() (string, error)
-
-// SetHostAdapterMACHook overrides HostAdapterMAC in tests. Pass nil to restore default.
-func SetHostAdapterMACHook(fn func() (string, error)) {
-	hostAdapterMACHook = fn
-}
-
 // HostAdapterMAC returns the local default Bluetooth controller address.
 func HostAdapterMAC() (string, error) {
 	if hostAdapterMACHook != nil {

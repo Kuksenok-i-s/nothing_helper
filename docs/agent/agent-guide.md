@@ -27,9 +27,8 @@ Operating rules for AI agents in **tws_manager**.
 | Wire format / parsing | `internal/spp` | UI |
 | TX/RX / connect lifecycle | `internal/session`, `internal/bt` | direct UI |
 | Discover / autoconnect | `internal/connect` | spp parsers |
-| Shared UI commands | `internal/ui/presenter`, `internal/ui/actions` | duplicating in tui/gio |
-| TUI-only layout | `internal/ui/tui` | session internals |
-| Gio-only layout | `internal/ui/gio/view`, `internal/ui/gio/state` | session internals |
+| Shared UI commands | `internal/ui/presenter`, `internal/ui/actions` | duplicating in views |
+| Gio-only layout | `internal/ui/companion`, `internal/ui/companion` | session internals |
 | Flags / bootstrap | `internal/app` | — |
 | Packaging / CI change | `Makefile`, `packaging/`, `.github/workflows/` — see [development.md](development.md) | — |
 | Input validation | `internal/security` | ad-hoc regex in UI |

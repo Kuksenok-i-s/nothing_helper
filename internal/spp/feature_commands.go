@@ -18,6 +18,8 @@ type FeatureCommand struct {
 }
 
 var featureCommands = map[string]FeatureCommand{
+	"walkie-talkie": {Name: "Walkie Talkie", Feature: "walkie-talkie", GetCommand: CmdGetWalkieTalkie, SetCommand: CmdSetWalkieTalkie, SafeSet: true, Usage: "walkie-talkie get | walkie-talkie set <on|off>", BuildSetPayload: buildMicPayload},
+	"super-mic":     {Name: "Super Mic", Feature: "super-mic", GetCommand: CmdGetSuperMic, SetCommand: CmdSetSuperMic, SafeSet: true, Usage: "super-mic get | super-mic set <on|off>", BuildSetPayload: buildMicPayload},
 	"anc": {
 		Name:            "ANC",
 		Feature:         "anc",

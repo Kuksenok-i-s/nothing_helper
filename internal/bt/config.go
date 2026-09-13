@@ -7,6 +7,7 @@ import (
 )
 
 var configPathOverride func() string
+var bluetoothInfoFn = BluetoothInfo
 
 func ConfigPath() string {
 	if configPathOverride != nil {

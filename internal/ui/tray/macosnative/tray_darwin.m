@@ -33,7 +33,7 @@ static NSMenuItem *add_action_item(NSMenu *menu, NSString *title, int tag) {
 
 void tray_darwin_schedule_init(const char *tooltip, const void *iconData, int iconLen,
                                int showWindow, int showReconnect) {
-  NSString *tooltipStr = tooltip ? @(tooltip) : @"tws_manager";
+  NSString *tooltipStr = tooltip ? @(tooltip) : @"Nothing_helper";
   NSData *iconCopy = nil;
   if (iconData != NULL && iconLen > 0) {
     iconCopy = [NSData dataWithBytes:iconData length:iconLen];
@@ -63,7 +63,7 @@ void tray_darwin_schedule_init(const char *tooltip, const void *iconData, int ic
     [menu addItem:[NSMenuItem separatorItem]];
 
     if (showWindow) {
-      add_action_item(menu, @"Show window", 1);
+      add_action_item(menu, @"Open companion", 1);
     }
     add_action_item(menu, @"Refresh battery", 2);
     if (showReconnect) {

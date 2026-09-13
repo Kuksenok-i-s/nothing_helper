@@ -1,7 +1,7 @@
 Name:           tws_manager
 Version:        0.1.0
 Release:        1%{?dist}
-Summary:        TWS RFCOMM desktop client
+Summary:        Nothing_helper desktop client
 License:        MIT
 URL:            https://github.com/Kuksenok-i-s/nothing_helper
 Source0:        %{name}-%{version}.tar.gz
@@ -18,20 +18,18 @@ Requires:       libnotify
 Requires:       libayatana-appindicator-gtk3
 
 %description
-tws_manager is a Linux desktop client for controlling Nothing and CMF earbuds
+Nothing_helper is a Linux desktop client for controlling Nothing and CMF earbuds
 over Bluetooth RFCOMM with tray support, autoconnect, and safe protocol tooling.
 
 %prep
 %setup -q
 
 %build
-go build -o bin/tws_manager ./cmd/tws_manager
-go build -tags "gio systray" -o bin/tws_manager_gio ./cmd/tws_manager_gio
+go build -tags "gio systray" -o bin/tws_manager ./cmd/tws_manager
 go build -o bin/tws_manager_rfcomm_helper ./cmd/tws_manager_rfcomm_helper
 
 %install
 install -Dpm0755 bin/tws_manager %{buildroot}%{_bindir}/tws_manager
-install -Dpm0755 bin/tws_manager_gio %{buildroot}%{_bindir}/tws_manager_gio
 install -Dpm0755 bin/tws_manager_rfcomm_helper %{buildroot}%{_libexecdir}/tws_manager_rfcomm_helper
 install -Dpm0644 packaging/common/tws_manager.desktop %{buildroot}%{_datadir}/applications/tws_manager.desktop
 install -Dpm0644 packaging/common/tws_manager-autostart.desktop %{buildroot}%{_sysconfdir}/xdg/autostart/tws_manager.desktop
@@ -51,7 +49,6 @@ echo "Then log out and log back in."
 
 %files
 %{_bindir}/tws_manager
-%{_bindir}/tws_manager_gio
 %{_libexecdir}/tws_manager_rfcomm_helper
 %{_datadir}/applications/tws_manager.desktop
 %{_sysconfdir}/xdg/autostart/tws_manager.desktop

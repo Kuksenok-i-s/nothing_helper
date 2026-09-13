@@ -43,7 +43,7 @@ func RegisterFlags(fs *flag.FlagSet, profile Profile) *FlagValues {
 	fs.IntVar(&v.Channel, "channel", 15, "RFCOMM channel used when creating --device with --addr")
 	fs.StringVar(&v.TracePath, "log", "", "write TX/RX trace events as NDJSON")
 	fs.StringVar(&v.ModelName, "model", "", "known model codename, product name, or Fast Pair ID")
-	fs.BoolVar(&v.AllowUnsafe, "unsafe", false, "allow unsafe SET/scan actions in UI")
+	fs.BoolVar(&v.AllowUnsafe, "unsafe", false, "allow unsafe protocol operations (not exposed by the companion GUI)")
 	fs.BoolVar(&v.NoProbe, "no-probe", false, "skip automatic identity/battery probes after connect")
 	fs.BoolVar(&v.LogRaw, "log-raw", false, "include raw packet bytes in trace/export logs")
 	fs.DurationVar(&v.QueryEvery, "query-every", 0, "send GET_BATTERY periodically, e.g. 30s")

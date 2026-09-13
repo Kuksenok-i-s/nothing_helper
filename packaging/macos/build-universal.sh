@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD_DIR="${BUILD_DIR:-$ROOT/dist/build/macos}"
-CMD="${CMD:-./cmd/tws_manager_gio}"
+CMD="${CMD:-./cmd/tws_manager}"
 TAGS="${TAGS:-gio systray}"
 OUT="${OUT:-$BUILD_DIR/tws_manager-universal}"
 

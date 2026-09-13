@@ -252,7 +252,7 @@ jobs:
         id: pkg
         run: |
           version="${{ steps.ver.outputs.version }}"
-          artifact="dist/tws_manager-${version}-linux-amd64.tar.gz"
+          artifact="dist/Nothing_helper-${version}-linux-amd64.tar.gz"
           if [[ ! -f "${artifact}" ]]; then
             echo "error: expected tarball not found: ${artifact}" >&2
             ls -la dist/ >&2 || true
@@ -308,11 +308,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: tws_manager v${{ needs.release-linux-deb-amd64.outputs.version }}
+          name: Nothing_helper v${{ needs.release-linux-deb-amd64.outputs.version }}
           files: |
             dist/deb-amd64/*
             dist/deb-arm64/*
             dist/arch-amd64/*
             dist/bundle/*
+          draft: true
           append_body: true
           generate_release_notes: true

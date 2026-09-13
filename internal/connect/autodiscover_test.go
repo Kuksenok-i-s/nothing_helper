@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -141,15 +142,19 @@ func TestConnectBestExistingRFCOMMNoMAC(t *testing.T) {
 
 func TestConnectBestExistingStaleMACRescans(t *testing.T) {
 	const stale, live = "AA:BB:CC:DD:EE:FF", "2C:BE:EE:4A:EC:9E"
+	transportRef := "/dev/rfcomm0"
+	if runtime.GOOS == "darwin" {
+		transportRef = "rfcomm:" + stale + ":15"
+	}
 	cfgPath := t.TempDir() + "/devices.json"
 	bt.SetConfigPathHook(func() string { return cfgPath })
 	t.Cleanup(func() { bt.SetConfigPathHook(nil) })
-	if err := bt.RememberDeviceMAC("/dev/rfcomm0", stale); err != nil {
+	if err := bt.RememberDeviceMAC(transportRef, stale); err != nil {
 		t.Fatal(err)
 	}
 
 	var boundMAC string
-	mgr := New(session.New(nil, false, false), Options{RFCOMMPath: "/dev/rfcomm0", Channel: 15})
+	mgr := New(session.New(nil, false, false), Options{RFCOMMPath: transportRef, Channel: 15})
 	autoTestHooksVar = &autoTestHooks{
 		rfcommExists: func(m *Manager) (bool, error) { return true, nil },
 		discover: func(m *Manager, ctx context.Context) ([]bt.Device, error) {

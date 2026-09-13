@@ -4,26 +4,26 @@
 
 ### Скорее всего работает со всеми поддерживаемыми моделями, но абсолютной гарантии нет — буду рад баг-репортам
 
-# tws_manager - Go-клиент SPP
+<h1 align="center">Nothing_helper</h1>
+<p align="center"><strong>Компактное приложение для наушников **Nothing / CMF** на Linux и macOS. Заряд, ANC, эквалайзер, поиск наушников и управление кнопкой TALK — с компьютера.</strong></p>
+<p align="center"><a href="https://github.com/Kuksenok-i-s/nothing_helper/releases/latest">Скачать последнюю версию</a> · <a href="LICENSE">MIT</a></p>
 
-CLI/TUI и GUI-клиент для наушников и гарнитур **Nothing** и **CMF** по Bluetooth RFCOMM (SPP). Читает батарею, статус, ANC/EQ/spatial/dual, ведёт лог пакетов и позволяет безопасно исследовать протокол без официального приложения.
+<p align="center">
+  <img src="pics/companion.png" width="350" alt="Nothing_helper — dark theme">
+  <img src="pics/companion-light.png" width="350" alt="Nothing_helper — light theme">
+</p>
 
-**Область:** линейка Nothing Ear / CMF Buds (и близкие SPP-совместимые варианты). Другие бренды — вне scope.
+Тёмная и светлая темы. Скриншоты интерфейса с демонстрационными данными.
 
-Проект не аффилирован с Nothing Technology Limited. Названия Nothing/CMF и связанные товарные знаки принадлежат их правообладателям и используются только для описания совместимости.
+Системные имена Linux-пакетов и команда `tws_manager` сохранены для совместимости при обновлении.
 
-Работает **локально** на Linux: обнаружение через `bluetoothctl`, RFCOMM `/dev/rfcommN`, без сетевого API.
-
-Пример работы
-![главное_окно](pics/main_control.png)
-
-![логи_и_дебаг](pics/logs.png)
-
+Независимый проект сообщества, не связанный с Nothing Technology Limited. macOS — экспериментальная поддержка; возможности зависят от модели.
 
 ## Возможности
 
-- **TUI** (Bubble Tea) - устройства, управление, лог пакетов
-- **GUI** (Gio, `-tags gio`) - тот же функционал в графическом интерфейсе
+- **Nothing_helper** (Gio, `-tags gio`) — компактное управление зарядом и звуком, выбор устройств, диагностика
+- **Walkie Talkie (Ear (3))** — управление кнопкой TALK на кейсе. Сначала запустите Bluetooth-микрофон в звонке или программе записи; приложение проверит поток и включит Super Mic. Само приложение звук не записывает.
+- **Поиск наушников** — нажмите силуэт наушника: сигнал запускается после проверки датчика ношения и автоматически останавливается
 - **System tray** (`-tags systray`) - статус, батарея, reconnect из трея
 - **Автоподключение** - поиск Nothing/CMF и reconnect при обрыве
 - **Парсинг протокола** - батарея (L/R/case), статус, identity, firmware, ANC, EQ, spatial, dual, lag
@@ -46,45 +46,26 @@ CLI/TUI и GUI-клиент для наушников и гарнитур **Noth
 ## Быстрый старт
 
 ```bash
-# клонировать и собрать
-git clone <repo-url> tws_manager && cd tws_manager
-make build          # bin/tws_manager (TUI)
+make build          # bin/tws_manager — GUI + tray
+make run            # compact companion
+make run-gio-lite   # GUI without system tray
+make run ARGS="--addr AA:BB:CC:DD:EE:FF --channel 15"
 make test
-
-# TUI - уже есть /dev/rfcomm0
-make run ARGS="--device /dev/rfcomm0"
-
-# TUI - создать RFCOMM интерактивно (preflight)
-make run
-
-# с явным MAC
-go run ./cmd/tws_manager --device /dev/rfcomm0 --addr AA:BB:CC:DD:EE:FF --channel 15
-
-# автопоиск и подключение
-go run ./cmd/tws_manager --auto
-
-# Gio GUI (tray по умолчанию)
-make run-gio
-
-# Gio без tray (без libayatana-appindicator)
-make run-gio-lite
 ```
 
-При первом запуске без готового `/dev/rfcommN` TUI предложит выбрать устройство из discovery и создать RFCOMM-узел (режим зависит от `--privilege-helper`).
+Сначала выполните сопряжение в настройках Bluetooth системы. На вкладке «Устройства» можно найти и выбрать наушники; подключение и настройка RFCOMM выполняются в фоне.
 
 ## Сборка
 
 | Цель | Команда | Результат |
 |------|---------|-----------|
-| TUI | `make build` | `bin/tws_manager` |
-| TUI + tray | `make build-systray` | `bin/tws_manager` |
-| Gio + tray | `make build-gio` | `bin/tws_manager_gio` |
-| Gio без tray | `make build-gio-lite` | `bin/tws_manager_gio` |
+| Gio + tray | `make build-gio` | `bin/tws_manager` |
+| Gio без tray | `make build-gio-lite` | `bin/tws_manager` |
 | Тесты | `make test` | `go test ./...` |
 
 ## Флаги CLI
 
-Общие для `cmd/tws_manager` и `cmd/tws_manager_gio` (значения по умолчанию могут отличаться):
+Флаги `cmd/tws_manager`:
 
 | Флаг | По умолчанию | Описание |
 |------|--------------|----------|
@@ -97,16 +78,16 @@ make run-gio-lite
 | `--capture-dir` | `captures` | каталог JSON-экспорта пакетов |
 | `--no-probe` | `false` | не слать identity/battery после connect |
 | `--query-every` | `0` (или `60s` при `--notify`) | периодический GET_BATTERY, напр. `30s` |
-| `--unsafe` | `false` | разрешить SET и raw scan в UI |
-| `--auto` | TUI: `false`, Gio: `true` | автопоиск и подключение |
-| `--notify` | TUI: `false`, Gio: `true` | desktop-уведомления (нужны `gdbus` или `libnotify` / `notify-send`) |
-| `--privilege-helper` | TUI: `sudo`, Gio: `auto` | backend для privileged операций: `sudo`, `polkit`, `auto`, `none` |
+| `--unsafe` | `false` | разрешить unsafe-операции протокола вне GUI |
+| `--auto` | `true` | автопоиск и подключение |
+| `--notify` | `true` | desktop-уведомления (нужны `gdbus` или `libnotify` / `notify-send`) |
+| `--privilege-helper` | `auto` | backend для privileged операций: `sudo`, `polkit`, `auto`, `none` |
 | `--privilege-helper-path` | - | путь к `tws_manager_rfcomm_helper` для `polkit` |
 
 Пример с трассировкой:
 
 ```bash
-go run ./cmd/tws_manager --device /dev/rfcomm0 --log captures/session.ndjson --log-raw
+go run -tags gio ./cmd/tws_manager --device /dev/rfcomm0 --log captures/session.ndjson --log-raw
 ```
 
 ## Поддерживаемые устройства
@@ -128,21 +109,17 @@ go run ./cmd/tws_manager --device /dev/rfcomm0 --log captures/session.ndjson --l
 | Corsola | CMF Buds Pro | anc, eq, spatial |
 | Donphan | CMF Buds | eq |
 | Espeon | CMF Buds Pro 2 | anc, eq, spatial |
-| Girafarig, Gligar, … | codename-модели | см. `internal/spp/spp.go` |
+| Girafarig, Gligar, … | codename-модели | см. `internal/spp/models.go` |
 
 Feature-команды в UI: `anc`, `eq`, `spatial`, `lag`, `dual` - с учётом capability конкретной модели.
 
 ## Интерфейсы
 
-### TUI
+### Nothing_helper
 
-Вкладки **Devices** (discovery, bind, connect), **Control** (GET/SET, toggles для lag/spatial/dual), **Log** (история пакетов, экспорт). Клавиши и подсказки - в нижней строке UI.
+`make run` открывает новый компактный GUI. «Звук» показывает подтверждённый заряд и ANC; «Все настройки» раскрывает EQ, интенсивность ANC, spatial audio, низкую задержку и dual-подключение с учётом модели. «Устройства» — поиск и подключение, «Диагностика» — техническое состояние и JSON-экспорт. Walkie Talkie доступен на Ear (3) при активном потоке Bluetooth-микрофона. На Linux для проверки нужны PipeWire и `pw-dump`, на macOS используется CoreAudio.
 
-Валидированные UI SET-команды (ANC/EQ/spatial/lag/dual) доступны из Control без `--unsafe`. Raw scan доступен только с `--unsafe` и требует **двойного Enter**.
-
-### Gio GUI
-
-Сборка: `make run-gio` или `go run -tags "gio systray" ./cmd/tws_manager_gio`. Sidebar: устройства, control, log. По умолчанию включены `--auto`, `--notify` и `--privilege-helper=auto`; если polkit helper не установлен, GUI запросит sudo-пароль в окне.
+Есть тёмная и светлая темы. С поддержкой трея закрытие окна скрывает его; Open companion возвращает окно, Quit завершает приложение. Без трея закрытие завершает работу. Старый Bubble Tea TUI и прежние экраны Gio удалены.
 
 ### System tray
 
@@ -189,11 +166,11 @@ Feature-команды в UI: `anc`, `eq`, `spatial`, `lag`, `dual` - с учё�
 ```bash
 make build-helper
 make build-gio-package
-make package-deb              # .deb -> dist/tws_manager_<version>-1_<arch>.deb
+make package-deb              # .deb -> dist/tws-manager_<version>-1_<arch>.deb
 make package-arch             # Arch pkg -> dist/
 make package-rpm
-make package-macos            # macOS: dist/tws_manager-<version>-universal.dmg
-make client-bundle-linux      # portable tarball -> dist/tws_manager-<version>-linux-amd64.tar.gz
+make package-macos            # macOS: dist/Nothing_helper-<version>-universal.dmg
+make client-bundle-linux      # portable tarball -> dist/Nothing_helper-<version>-linux-amd64.tar.gz
 ```
 
 Версия для локальной сборки (опционально):
@@ -213,8 +190,7 @@ PKG_VERSION=0.2.0 make client-bundle-linux
 ## Структура проекта
 
 ```
-cmd/tws_manager/          TUI entrypoint
-cmd/tws_manager_gio/      Gio GUI entrypoint (-tags gio)
+cmd/tws_manager/          Companion entrypoint
 cmd/tws_manager_rfcomm_helper/ privileged helper for polkit
 internal/
   app/                    флаги, bootstrap, shutdown
@@ -225,10 +201,9 @@ internal/
   notify/                 desktop notifications
   trace/                  NDJSON лог, redaction
   security/               валидация MAC, путей, канала
-  ui/tui/                 Bubble Tea
-  ui/gio/                 Gio GUI
+  ui/companion/                 Gio GUI
   ui/tray/                system tray
-  ui/presenter/           общий каталог команд для TUI/Gio
+  ui/presenter/           общий каталог команд для Companion
 ```
 
 Карта для агентов и инварианты: [AGENTS.md](AGENTS.md).
@@ -260,11 +235,11 @@ GitHub Actions в `.github/workflows/`:
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-Оба release-workflow прикрепляют артефакты к одному GitHub Release (`tws_manager v<version>`). Ручной запуск: **Actions → Release Linux client / Release macOS client → Run workflow** (опционально переопределить версию).
+Оба release-workflow прикрепляют артефакты к одному черновику GitHub Release; публикуйте его после проверки всех сборок (`Nothing_helper v<version>`). Ручной запуск: **Actions → Release Linux client / Release macOS client → Run workflow** (опционально переопределить версию).
 
 ## Ограничения
 
 - **Linux** — основная платформа (BlueZ, `/dev/rfcommN`, polkit helper).
-- **macOS** — экспериментально (IOBluetooth RFCOMM, Gio GUI); TUI RFCOMM preflight пока нет.
-- Не замена официального приложения: OTA, find-my, персонализация жестов и часть фич не реализованы.
+- **macOS** — экспериментально (IOBluetooth RFCOMM, Gio GUI).
+- Не замена официального приложения: OTA, персонализация жестов и часть фич не реализованы.
 - Протокол восстановлен по наблюдаемому трафику и поведению устройств; поведение на непроверенных моделях может отличаться.

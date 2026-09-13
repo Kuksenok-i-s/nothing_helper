@@ -5,8 +5,10 @@ set -euo pipefail
 SRC="${1:?usage: mk-icns.sh source.png output.icns}"
 OUT="${2:?usage: mk-icns.sh source.png output.icns}"
 
-ICONSET="$(mktemp -d "${TMPDIR:-/tmp}/iconset.XXXXXX")"
-trap 'rm -rf "$ICONSET"' EXIT
+ICON_TMP="$(mktemp -d "${TMPDIR:-/tmp}/nothing-icon.XXXXXX")"
+trap 'rm -rf "$ICON_TMP"' EXIT
+ICONSET="$ICON_TMP/app.iconset"
+mkdir -p "$ICONSET"
 
 declare -a sizes=(16 32 128 256 512)
 for size in "${sizes[@]}"; do

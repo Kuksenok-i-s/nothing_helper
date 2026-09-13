@@ -73,7 +73,7 @@ jobs:
         shell: bash
         run: |
           version="${{ steps.ver.outputs.version }}"
-          artifact="dist/tws_manager-${version}-universal.dmg"
+          artifact="dist/Nothing_helper-${version}-universal.dmg"
           if [[ ! -f "${artifact}" ]]; then
             echo "error: expected DMG not found: ${artifact}" >&2
             ls -la dist/ >&2 || true
@@ -107,7 +107,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: tws_manager v${{ needs.release-macos-client.outputs.version }}
+          name: Nothing_helper v${{ needs.release-macos-client.outputs.version }}
           files: dist/macos/*
+          draft: true
           append_body: true
           generate_release_notes: true

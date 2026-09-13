@@ -22,7 +22,7 @@ const (
 // this does not take over NSApplication — Gio keeps the main event loop.
 func Run(ctx context.Context, s *session.Session, opts Options) {
 	if opts.AppName == "" {
-		opts.AppName = "tws_manager"
+		opts.AppName = "Nothing_helper"
 	}
 
 	menuClicks := make(chan int32, 8)
@@ -66,13 +66,21 @@ func darwinMenuLoop(ctx context.Context, s *session.Session, opts Options, menuC
 					opts.OnShowWindow()
 				}
 			case menuRefresh:
-				_ = s.SendCommand(spp.CmdGetBattery, session.Meta{Source: "tray", Trigger: "battery refresh"})
+				if opts.OnRefresh != nil {
+					opts.OnRefresh()
+				} else {
+					_ = s.SendCommand(spp.CmdGetBattery, session.Meta{Source: "tray", Trigger: "battery refresh"})
+				}
 			case menuReconnect:
 				if opts.OnReconnect != nil {
 					go opts.OnReconnect()
 				}
 			case menuDisconnect:
-				_ = s.Close()
+				if opts.OnDisconnect != nil {
+					opts.OnDisconnect()
+				} else {
+					_ = s.Close()
+				}
 			case menuQuit:
 				if opts.OnQuit != nil {
 					opts.OnQuit()

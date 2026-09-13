@@ -1,6 +1,7 @@
 package spp
 
 const (
+	CmdFindEarbud            = 0xF002
 	CmdGetProtocolVersion    = 0xC001
 	CmdGetStatus             = 0xC00A
 	CmdGetFirmwareVersion    = 0xC042

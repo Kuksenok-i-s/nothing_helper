@@ -36,7 +36,7 @@ func tooltipForSnapshot(snap session.Snapshot) string {
 		name = snap.Device.Name
 	}
 	if name == "" {
-		name = "tws_manager"
+		name = "Nothing_helper"
 	}
 	return strings.TrimSpace(fmt.Sprintf("%s · %s", name, formatBatteries(snap.Batteries)))
 }

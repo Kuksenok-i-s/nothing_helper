@@ -10,12 +10,15 @@ import (
 )
 
 type ParsedPacket struct {
-	Kind      string
-	Summary   string
-	Text      string
-	Batteries map[string]Battery
-	DualList  *DualDeviceList
-	Warnings  []string
+	SuperMicEnabled     *bool
+	WalkieTalkieEnabled *bool
+	Earbuds             map[string]EarbudStatus
+	Kind                string
+	Summary             string
+	Text                string
+	Batteries           map[string]Battery
+	DualList            *DualDeviceList
+	Warnings            []string
 }
 
 // DualDevice is one peer entry from GET_DUAL_DEVICE_LIST (0x4028).
@@ -38,6 +41,9 @@ type DualDeviceList struct {
 type PacketParser func(Packet, ModelInfo) ParsedPacket
 
 var packetParsers = map[uint16]PacketParser{
+	CmdRspSuperMic:           parseSuperMicPacket,
+	CmdRspWalkieTalkie:       parseWalkieTalkiePacket,
+	CmdWalkieTalkieChanged:   parseWalkieTalkiePacket,
 	CmdBatteryChanged:        parseBatteryPacket("battery_changed"),
 	CmdBattery:               parseBatteryPacket("battery_full"),
 	CmdBudsBattery:           parseBatteryPacket("battery_buds"),
@@ -94,7 +100,7 @@ func parseBatteryPacket(kind string) PacketParser {
 		if !ok {
 			return ParsedPacket{
 				Kind:    kind,
-				Summary: fmt.Sprintf("%s: % x", kind, pkt.Payload),
+				Summary: fmt.Sprintf("%s: payload_bytes=%d", kind, len(pkt.Payload)),
 				Warnings: []string{
 					"payload does not match [count][id,value] battery layout",
 				},
@@ -131,13 +137,16 @@ func parseStatusPacket(kind string) PacketParser {
 		if !ok {
 			return ParsedPacket{
 				Kind:    kind,
-				Summary: fmt.Sprintf("%s: rsp=%02x payload=% x", kind, pkt.RspCode(), pkt.Payload),
+				Summary: fmt.Sprintf("%s: rsp=%02x payload_bytes=%d", kind, pkt.RspCode(), len(pkt.Payload)),
 			}
 		}
-		return ParsedPacket{
-			Kind:    kind,
-			Summary: fmt.Sprintf("%s: %s", kind, strings.Join(formatStatusParts(pairs), " ")),
+		earbuds := map[string]EarbudStatus{}
+		for _, pair := range pairs {
+			if pair[0] == 2 || pair[0] == 3 {
+				earbuds[partNames[pair[0]]] = EarbudStatus{InEar: pair[1]&4 != 0, InCase: pair[1]&1 != 0, Connected: pair[1]&128 != 0}
+			}
 		}
+		return ParsedPacket{Kind: kind, Earbuds: earbuds, Summary: fmt.Sprintf("%s: %s", kind, strings.Join(formatStatusParts(pairs), " "))}
 	}
 }
 
@@ -255,7 +264,7 @@ func parseSupportedFeaturePacket(kind string) PacketParser {
 	return func(pkt Packet, model ModelInfo) ParsedPacket {
 		return ParsedPacket{
 			Kind:    kind,
-			Summary: fmt.Sprintf("%s: dual_list=%t payload=% x", kind, SupportedFeatureDualList(pkt.Payload), pkt.Payload),
+			Summary: fmt.Sprintf("%s: dual_list=%t payload_bytes=%d", kind, SupportedFeatureDualList(pkt.Payload), len(pkt.Payload)),
 		}
 	}
 }
@@ -269,7 +278,7 @@ func parseRawPacket(kind string) PacketParser {
 	return func(pkt Packet, model ModelInfo) ParsedPacket {
 		return ParsedPacket{
 			Kind:    kind,
-			Summary: fmt.Sprintf("%s: rsp=%02x payload=% x", kind, pkt.RspCode(), pkt.Payload),
+			Summary: fmt.Sprintf("%s: rsp=%02x payload_bytes=%d", kind, pkt.RspCode(), len(pkt.Payload)),
 		}
 	}
 }
@@ -279,7 +288,7 @@ func parseTextPacket(kind string) PacketParser {
 		return ParsedPacket{
 			Kind:    kind,
 			Text:    string(pkt.Payload),
-			Summary: fmt.Sprintf("%s raw=%q hex=% x", kind, pkt.Payload, pkt.Payload),
+			Summary: fmt.Sprintf("%s: payload_bytes=%d", kind, len(pkt.Payload)),
 		}
 	}
 }
@@ -320,7 +329,7 @@ func parseANCPacket(kind string) PacketParser {
 		if len(p) < 3 || len(p)%3 != 0 {
 			return ParsedPacket{
 				Kind:    kind,
-				Summary: fmt.Sprintf("%s: rsp=%02x payload=% x", kind, pkt.RspCode(), p),
+				Summary: fmt.Sprintf("%s: rsp=%02x payload_bytes=%d", kind, pkt.RspCode(), len(p)),
 			}
 		}
 		mode, level := summarizeANCTriples(p)
@@ -376,7 +385,7 @@ func parseSpatialPacket(kind string) PacketParser {
 	return func(pkt Packet, model ModelInfo) ParsedPacket {
 		p := pkt.Payload
 		if len(p) < 2 {
-			return ParsedPacket{Kind: kind, Summary: fmt.Sprintf("%s: payload=% x", kind, p)}
+			return ParsedPacket{Kind: kind, Summary: fmt.Sprintf("%s: payload_bytes=%d", kind, len(p))}
 		}
 		onoff := func(b byte) string {
 			if b != 0 {
@@ -396,7 +405,7 @@ func parseLagPacket(kind string) PacketParser {
 		if len(pkt.Payload) < 1 {
 			return ParsedPacket{
 				Kind:    kind,
-				Summary: fmt.Sprintf("%s: rsp=%02x payload=% x", kind, pkt.RspCode(), pkt.Payload),
+				Summary: fmt.Sprintf("%s: rsp=%02x payload_bytes=%d", kind, pkt.RspCode(), len(pkt.Payload)),
 			}
 		}
 		mode := pkt.Payload[0]
@@ -432,7 +441,7 @@ func parseSetAckPacket(kind string) PacketParser {
 		if len(pkt.Payload) > 1 {
 			return ParsedPacket{
 				Kind:    kind,
-				Summary: fmt.Sprintf("%s: %s payload=% x", kind, result, pkt.Payload),
+				Summary: fmt.Sprintf("%s: %s payload_bytes=%d", kind, result, len(pkt.Payload)),
 			}
 		}
 		return ParsedPacket{
@@ -447,7 +456,7 @@ func parseDualPacket(kind string) PacketParser {
 		if len(pkt.Payload) < 1 {
 			return ParsedPacket{
 				Kind:    kind,
-				Summary: fmt.Sprintf("%s: rsp=%02x payload=% x", kind, pkt.RspCode(), pkt.Payload),
+				Summary: fmt.Sprintf("%s: rsp=%02x payload_bytes=%d", kind, pkt.RspCode(), len(pkt.Payload)),
 			}
 		}
 		enabled := pkt.Payload[0] == 1
@@ -471,7 +480,7 @@ func parseDualDeviceListPacket(kind string) PacketParser {
 		if err != nil {
 			return ParsedPacket{
 				Kind:     kind,
-				Summary:  fmt.Sprintf("%s: payload=% x", kind, pkt.Payload),
+				Summary:  fmt.Sprintf("%s: payload_bytes=%d", kind, len(pkt.Payload)),
 				Warnings: []string{err.Error()},
 			}
 		}
@@ -479,7 +488,7 @@ func parseDualDeviceListPacket(kind string) PacketParser {
 		if len(summaries) == 0 {
 			return ParsedPacket{
 				Kind:     kind,
-				Summary:  fmt.Sprintf("%s: total=%d current=%d count=%d payload=% x", kind, list.Total, list.Current, len(list.Devices), pkt.Payload),
+				Summary:  fmt.Sprintf("%s: total=%d current=%d count=%d payload_bytes=%d", kind, list.Total, list.Current, len(list.Devices), len(pkt.Payload)),
 				DualList: &list,
 			}
 		}
@@ -651,7 +660,7 @@ func parseUnknownPacket(pkt Packet, model ModelInfo) ParsedPacket {
 		return ParsedPacket{
 			Kind:    "unknown_text",
 			Text:    text,
-			Summary: fmt.Sprintf("unknown_text: rsp=%02x cmd=%04x text=%q hex=% x", pkt.RspCode(), pkt.Cmd, text, pkt.Payload),
+			Summary: fmt.Sprintf("unknown_text: rsp=%02x cmd=%04x payload_bytes=%d", pkt.RspCode(), pkt.Cmd, len(pkt.Payload)),
 		}
 	}
 
@@ -666,19 +675,9 @@ func parseUnknownPacket(pkt Packet, model ModelInfo) ParsedPacket {
 			Warnings:  warnings,
 		}
 	}
-
-	bitView := ""
-	if len(pkt.Payload) > 0 && len(pkt.Payload) <= 8 {
-		parts := make([]string, 0, len(pkt.Payload))
-		for _, b := range pkt.Payload {
-			parts = append(parts, fmt.Sprintf("%08b", b))
-		}
-		bitView = " bits=" + strings.Join(parts, " ")
-	}
-
 	return ParsedPacket{
 		Kind:    "unknown",
-		Summary: fmt.Sprintf("unknown: rsp=%02x cmd=%04x payload=% x%s", pkt.RspCode(), pkt.Cmd, pkt.Payload, bitView),
+		Summary: fmt.Sprintf("unknown: rsp=%02x cmd=%04x payload_bytes=%d", pkt.RspCode(), pkt.Cmd, len(pkt.Payload)),
 	}
 }
 

@@ -16,6 +16,9 @@ var systemProfilerMAC = regexp.MustCompile(`(?i)Bluetooth Address:\s*([0-9A-F:]{
 
 // HostAdapterMAC returns the local Bluetooth controller address.
 func HostAdapterMAC() (string, error) {
+	if hostAdapterMACHook != nil {
+		return hostAdapterMACHook()
+	}
 	if mac, err := bt.HostAdapterMAC(); err == nil && mac != "" {
 		return mac, nil
 	}
