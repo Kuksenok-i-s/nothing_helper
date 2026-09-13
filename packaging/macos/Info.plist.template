@@ -23,6 +23,6 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>tws_manager needs Bluetooth to connect to Nothing/CMF earbuds over RFCOMM.</string>
+	<string>Nothing_helper needs Bluetooth to connect to Nothing/CMF earbuds over RFCOMM.</string>
 </dict>
 </plist>

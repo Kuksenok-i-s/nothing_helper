@@ -24,16 +24,16 @@ Output:
 | Artifact | Path |
 |----------|------|
 | Universal binary | `dist/build/macos/tws_manager-universal` |
-| App bundle | `dist/tws_manager.app` |
-| DMG installer | `dist/tws_manager-0.1.0-universal.dmg` |
+| App bundle | `dist/Nothing_helper.app` |
+| DMG installer | `dist/Nothing_helper-0.1.0-universal.dmg` |
 
-Install: open the DMG and drag **tws_manager.app** to **Applications**.
+Install: open the DMG and drag **Nothing_helper.app** to **Applications**.
 
 Custom version:
 
 ```bash
 VERSION=0.2.0 make package-macos
-# -> dist/tws_manager-0.2.0-universal.dmg
+# -> dist/Nothing_helper-0.2.0-universal.dmg
 ```
 
 ## Scripts
@@ -49,7 +49,7 @@ Local dev bundle (native arch only, no DMG):
 
 ```bash
 ./packaging/macos/bundle.sh
-open dist/tws_manager.app
+open dist/Nothing_helper.app
 ```
 
 ## Architecture
@@ -92,4 +92,4 @@ For distribution outside your machine, sign with a Developer ID certificate and 
 
 ## CI release
 
-On tag `v*` (or manual **Actions → Release macOS client**), GitHub Actions runs `make package-macos` on `macos-14` and publishes `dist/tws_manager-<version>-universal.dmg` to GitHub Releases. Version comes from [scripts/pkg-version.sh](../../scripts/pkg-version.sh).
+On tag `v*` (or manual **Actions → Release macOS client**), GitHub Actions runs `make package-macos` on `macos-14` and publishes `dist/Nothing_helper-<version>-universal.dmg` to GitHub Releases. Version comes from [scripts/pkg-version.sh](../../scripts/pkg-version.sh).

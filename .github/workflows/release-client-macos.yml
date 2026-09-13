@@ -29,13 +29,13 @@ jobs:
           cache: true
 
       - name: Vet
-        run: go vet ./...
+        run: go vet -tags "gio systray" ./...
 
       - name: Build
-        run: go build ./...
+        run: go build -tags "gio systray" ./...
 
       - name: Test
-        run: go test ./...
+        run: go test -tags "gio systray" ./...
 
   release-macos-client:
     name: macOS universal DMG
@@ -79,7 +79,7 @@ jobs:
             ls -la dist/ >&2 || true
             exit 1
           fi
-          shasum -a 256 "${artifact}" > "${artifact}.sha256"
+          (cd dist && shasum -a 256 "${artifact##*/}") > "${artifact}.sha256"
           echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload build artifact

@@ -84,7 +84,7 @@ jobs:
             ls -la dist/ >&2 || true
             exit 1
           fi
-          sha256sum "${artifact}" > "${artifact}.sha256"
+          (cd dist && sha256sum "${artifact##*/}") > "${artifact}.sha256"
           echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload build artifact
@@ -142,7 +142,7 @@ jobs:
             ls -la dist/ >&2 || true
             exit 1
           fi
-          sha256sum "${artifact}" > "${artifact}.sha256"
+          (cd dist && sha256sum "${artifact##*/}") > "${artifact}.sha256"
           echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload build artifact
@@ -203,7 +203,7 @@ jobs:
             ls -la dist/ packaging/arch/ >&2 || true
             exit 1
           fi
-          sha256sum "${artifact}" > "${artifact}.sha256"
+          (cd dist && sha256sum "${artifact##*/}") > "${artifact}.sha256"
           echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload build artifact
@@ -258,7 +258,7 @@ jobs:
             ls -la dist/ >&2 || true
             exit 1
           fi
-          sha256sum "${artifact}" > "${artifact}.sha256"
+          (cd dist && sha256sum "${artifact##*/}") > "${artifact}.sha256"
           echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload build artifact
