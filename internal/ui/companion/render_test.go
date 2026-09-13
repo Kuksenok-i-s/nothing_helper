@@ -48,6 +48,10 @@ func TestRenderCompanion(t *testing.T) {
 	var ops op.Ops
 	size := image.Pt(430, 780)
 	v := newView()
+	v.language = English
+	if os.Getenv("COMPANION_RENDER_LANGUAGE") == "ru" {
+		v.language = Russian
+	}
 	v.light = os.Getenv("COMPANION_RENDER_THEME") == "light"
 	v.details = os.Getenv("COMPANION_RENDER_DETAILS") == "1"
 	if os.Getenv("COMPANION_RENDER_NARROW") == "1" {

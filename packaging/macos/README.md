@@ -23,10 +23,12 @@ make check-gui                     # vet + race tests with gio systray
 Equivalent direct command: `go run -tags "gio systray" ./cmd/nothing_helper`.
 The old TUI and separate Gio entrypoint were removed. `make run-gio` and `make build-gio` are compatibility aliases. The `nowayland` tag is only useful for selecting X11/XWayland on Linux; macOS uses native window decorations already.
 
+English is the default GUI language. Use **All settings → Interface language** to select English or Русский. The selection is saved in `~/Library/Application Support/nothing_helper/interface.json`; switching does not require restarting the app.
+
 ## Native .app
 
 ```bash
-make macos-app VERSION=1.2.0
+make macos-app VERSION=1.2.2
 open dist/Nothing_helper.app
 ```
 
@@ -35,17 +37,17 @@ This builds for the host architecture and assembles `dist/Nothing_helper.app`. I
 ## Universal installer (Apple Silicon + Intel)
 
 ```bash
-make package-macos VERSION=1.2.0
-open dist/Nothing_helper-1.2.0-universal.dmg
+make package-macos VERSION=1.2.2
+open dist/Nothing_helper-1.2.2-universal.dmg
 ```
 
 Outputs:
 
 - `dist/build/macos/nothing_helper-universal` — combined arm64 and x86_64 binary.
 - `dist/Nothing_helper.app` — universal application bundle.
-- `dist/Nothing_helper-1.2.0-universal.dmg` — installer with an Applications shortcut.
+- `dist/Nothing_helper-1.2.2-universal.dmg` — installer with an Applications shortcut.
 
-Drag **Nothing_helper.app** to **Applications**. Always pass `VERSION` for local packaging; scripts default to `0.1.0`. In CI, the workflow resolves the tag or manual version input and passes `VERSION` to Make. These builds require macOS and the Xcode SDK; setting `GOOS=darwin` on Linux is insufficient for the native frameworks.
+Drag **Nothing_helper.app** to **Applications**. Always pass `VERSION` for local packaging; scripts default to `1.2.2`. In CI, the workflow resolves the tag or manual version input and passes `VERSION` to Make. These builds require macOS and the Xcode SDK; setting `GOOS=darwin` on Linux is insufficient for the native frameworks.
 
 Verify the bundle:
 
@@ -90,5 +92,5 @@ A new `v*` tag starts the Linux and macOS release workflows. The macOS workflow 
 After downloading both files into the same directory:
 
 ```bash
-shasum -a 256 -c Nothing_helper-1.2.0-universal.dmg.sha256
+shasum -a 256 -c Nothing_helper-1.2.2-universal.dmg.sha256
 ```

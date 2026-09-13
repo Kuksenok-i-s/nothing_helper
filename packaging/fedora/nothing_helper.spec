@@ -1,5 +1,5 @@
 Name:           nothing_helper
-Version:        0.1.0
+Version:        1.2.2
 Release:        1%{?dist}
 Obsoletes:      tws_manager
 Provides:       tws_manager = %{version}-%{release}
