@@ -1,24 +1,35 @@
 .PHONY: help install-deps install-deps-debian run run-systray run-gio run-gio-lite run-gio-systray build build-systray build-gio build-gio-lite build-gio-systray build-helper build-gio-package prepare-debian debian-changelog package-deb package-arch package-arch-real package-rpm package-macos client-bundle-linux install-local vet test test-race check fmt lint clean profile-gio profile-gio-web sample-macos-app
 
 ARCH_BUILD_USER ?= builduser
+.DEFAULT_GOAL := help
 
 BINARY ?= tws_manager
-BINARY_GIO ?= tws_manager_gio
+BINARY_GIO ?= $(BINARY)
 BINARY_HELPER ?= tws_manager_rfcomm_helper
 CMD ?= ./cmd/tws_manager
-CMD_GIO ?= ./cmd/tws_manager_gio
+CMD_GIO ?= $(CMD)
 CMD_HELPER ?= ./cmd/tws_manager_rfcomm_helper
 ARGS ?=
 
+# X11/XWayland lets the desktop draw the system title bar on Linux.
+.PHONY: run-native build-native
+run-native:
+	go run -tags "gio systray nowayland" $(CMD_GIO) $(ARGS)
+
+build-native:
+	go build -tags "gio systray nowayland" -o bin/$(BINARY_GIO) $(CMD_GIO)
+
 help:
-	@echo "tws_manager targets:"
+	@echo "Nothing_helper targets:"
+	@echo "  make run-native         Run with system window frame (Linux: X11/XWayland)"
+	@echo "  make build-native       Build with system window frame"
 	@echo "  make install-deps        Install Debian/Ubuntu system packages"
-	@echo "  make run                 Run TUI CLI"
-	@echo "  make run-systray         Run TUI CLI with systray support"
+	@echo "  make run                 Run compact GUI"
+	@echo "  make run-systray         Run compact GUI with systray support"
 	@echo "  make run-gio             Run Gio GUI with systray support"
 	@echo "  make run-gio-lite        Run Gio GUI without systray"
-	@echo "  make build               Build TUI CLI to bin/$(BINARY)"
-	@echo "  make build-systray       Build TUI CLI with systray support"
+	@echo "  make build               Build compact GUI to bin/$(BINARY)"
+	@echo "  make build-systray       Build compact GUI with systray support"
 	@echo "  make build-gio           Build Gio GUI with systray support"
 	@echo "  make build-gio-lite      Build Gio GUI without systray"
 	@echo "  make build-helper        Build root helper binary"
@@ -75,11 +86,9 @@ install-deps-debian:
 		pkg-config \
 		rfkill
 
-run:
-	go run $(CMD) $(ARGS)
+run: run-gio
 
-run-systray:
-	go run -tags systray $(CMD) $(ARGS)
+run-systray: run-gio
 
 # Gio GUI with system tray (default). Requires libayatana-appindicator
 # (Arch/Manjaro: pacman -S libayatana-appindicator) and a GNOME AppIndicator
@@ -93,11 +102,9 @@ run-gio-lite:
 
 run-gio-systray: run-gio
 
-build:
-	go build -o bin/$(BINARY) $(CMD)
+build: build-gio
 
-build-systray:
-	go build -tags systray -o bin/$(BINARY) $(CMD)
+build-systray: build-gio
 
 build-gio:
 	go build -tags "gio systray" -o bin/$(BINARY_GIO) $(CMD_GIO)
@@ -110,7 +117,7 @@ build-gio-systray: build-gio
 build-helper:
 	go build -o bin/$(BINARY_HELPER) $(CMD_HELPER)
 
-build-gio-package: build-gio build-helper build
+build-gio-package: build-gio build-helper
 
 prepare-debian:
 	ln -sfn "$(CURDIR)/packaging/debian" "$(CURDIR)/debian"
@@ -125,10 +132,10 @@ package-deb: build-gio-package debian-changelog prepare-debian
 
 client-bundle-linux: build-gio-package
 	@mkdir -p dist
-	@version="$$(./scripts/pkg-version.sh)"; \
+	@version="$${PKG_VERSION:-$$(./scripts/pkg-version.sh)}"; \
 	arch="$${ARCH:-amd64}"; \
-	tar -czf "dist/tws_manager-$${version}-linux-$${arch}.tar.gz" \
-		-C bin tws_manager tws_manager_gio tws_manager_rfcomm_helper
+	tar -czf "dist/Nothing_helper-$${version}-linux-$${arch}.tar.gz" \
+		-C bin tws_manager tws_manager_rfcomm_helper
 
 # makepkg refuses to run as root; CI Arch containers start as root.
 package-arch:
@@ -156,7 +163,6 @@ package-macos:
 
 install-local: build-gio-package
 	sudo install -Dm755 bin/$(BINARY) /usr/local/bin/$(BINARY)
-	sudo install -Dm755 bin/$(BINARY_GIO) /usr/local/bin/$(BINARY_GIO)
 	sudo install -Dm755 bin/$(BINARY_HELPER) /usr/local/libexec/$(BINARY_HELPER)
 	sudo install -Dm644 packaging/common/tws_manager.desktop /usr/local/share/applications/tws_manager.desktop
 	sudo install -Dm644 packaging/common/tws_manager-autostart.desktop /etc/xdg/autostart/tws_manager.desktop

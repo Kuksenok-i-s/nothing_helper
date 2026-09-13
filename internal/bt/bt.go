@@ -34,7 +34,6 @@ var (
 	execCmdRun            = func(cmd *exec.Cmd) error { return cmd.Run() }
 	execCmdCombinedOutput = func(cmd *exec.Cmd) ([]byte, error) { return cmd.CombinedOutput() }
 	execSudoHook          func(args ...string) error
-	bluetoothInfoFn       = BluetoothInfo
 )
 
 var (
@@ -284,10 +283,11 @@ func ReviveRFCOMMDevice(device, address string, channel int, progress RFCOMMProg
 	}
 
 	report(progress, "verifying RFCOMM device")
-	if _, err := rfcommOpenFile(device, 2*time.Second); err != nil {
+	f, err := rfcommOpenFile(device, 2*time.Second)
+	if err != nil {
 		return wrapRFCOMMRevive(wrapRFCOMMOpen(fmt.Errorf("verify open %q: %w", device, err)))
 	}
-	return nil
+	return f.Close()
 }
 
 func validateRFCCOMMBind(device, address string, channel int) (string, string, int, error) {

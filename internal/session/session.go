@@ -51,6 +51,7 @@ type Event struct {
 }
 
 type Snapshot struct {
+	Earbuds   map[string]EarbudState
 	Device    bt.Device
 	Model     spp.ModelInfo
 	Batteries map[string]spp.Battery
@@ -82,8 +83,12 @@ type pendingTX struct {
 }
 
 type Session struct {
+	earbuds        map[string]EarbudState
 	mu             sync.Mutex
 	connectMu      sync.Mutex
+	findMu         sync.Mutex // serializes find registration with explicit Close
+	activeFind     *findOperation
+	rxMu           sync.Mutex // serializes packet processing with transport replacement/teardown
 	txMu           sync.Mutex // serializes transport writes (IOBluetooth writeSync is not re-entrant)
 	transport      bt.Transport
 	device         bt.Device
@@ -147,7 +152,7 @@ func (s *Session) Snapshot() Snapshot {
 	for k, v := range s.config {
 		config[k] = v
 	}
-	return Snapshot{Device: s.device, Model: s.model, Batteries: batteries, DualList: dualList, Connected: s.transport != nil, Config: config}
+	return Snapshot{Earbuds: cloneEarbuds(s.earbuds), Device: s.device, Model: s.model, Batteries: batteries, DualList: dualList, Connected: s.transport != nil, Config: config}
 }
 
 func (s *Session) SetModel(model spp.ModelInfo) {
@@ -311,6 +316,7 @@ func (s *Session) installConnectTransport(device bt.Device, transportRef string,
 }
 
 func (s *Session) swapConnectTransport(device bt.Device, transport bt.Transport, usedChannel int) (*trace.Event, string) {
+	s.rxMu.Lock()
 	s.mu.Lock()
 	old := s.transport
 	s.transport = transport
@@ -324,6 +330,7 @@ func (s *Session) swapConnectTransport(device bt.Device, transport bt.Transport,
 	}
 	rawPath := s.openRawCaptureLocked()
 	s.mu.Unlock()
+	s.rxMu.Unlock()
 	_ = closeCloserWithTimeout(old, transportCloseTimeout)
 	return modelEvent, rawPath
 }
@@ -360,6 +367,7 @@ func (s *Session) initialProbe(device bt.Device) {
 	s.publish(Event{Kind: EventProgress, Device: device, Source: "auto_poll", Trigger: "sending initial battery query"})
 	_ = s.SendCommand(spp.CmdGetBattery, Meta{Source: "auto_poll", Trigger: "initial battery"})
 
+	_ = s.SendCommand(spp.CmdGetStatus, Meta{Source: "auto_poll", Trigger: "initial earbud status"})
 	s.probeConfig(device)
 }
 
@@ -374,6 +382,8 @@ func (s *Session) probeConfig(device bt.Device) {
 		trigger string
 	}
 	probes := []probe{
+		{feature: "super-mic", cmd: spp.CmdGetSuperMic, trigger: "super mic status"},
+		{feature: "walkie-talkie", cmd: spp.CmdGetWalkieTalkie, trigger: "walkie talkie status"},
 		{feature: "anc", cmd: spp.CmdGetNoiseReduction, trigger: "anc status"},
 		{feature: "lag", cmd: spp.CmdGetLagMode, trigger: "low latency status"},
 		{feature: "dual", cmd: spp.CmdGetDualEnable, trigger: "dual enable"},
@@ -453,14 +463,17 @@ func (s *Session) AttachTestLink(transport bt.Transport, device bt.Device) {
 }
 
 func (s *Session) Close() error {
+	s.findMu.Lock()
+	defer s.findMu.Unlock()
+	findErr := s.stopFindLocked()
 	s.mu.Lock()
 	transport := s.transport
 	s.mu.Unlock()
 	if transport == nil {
-		return nil
+		return findErr
 	}
 	closeErr := s.finalizeDisconnect(transport, "shutdown", "RFCOMM closed", nil)
-	return closeErr
+	return errors.Join(findErr, closeErr)
 }
 
 // finalizeDisconnect tears down the active RFCOMM link and live session state,
@@ -479,9 +492,11 @@ func (s *Session) finalizeDisconnect(transport bt.Transport, source, trigger str
 }
 
 func (s *Session) closeActiveTransport(transport bt.Transport) (wasConnected bool, dev bt.Device, closeErr error) {
+	s.rxMu.Lock()
 	s.mu.Lock()
 	if transport != nil && s.transport != transport {
 		s.mu.Unlock()
+		s.rxMu.Unlock()
 		return false, bt.Device{}, nil
 	}
 	wasConnected = s.transport != nil
@@ -494,6 +509,7 @@ func (s *Session) closeActiveTransport(transport bt.Transport) (wasConnected boo
 		s.clearLiveStateLocked()
 	}
 	s.mu.Unlock()
+	s.rxMu.Unlock()
 
 	// Close I/O outside the session mutex so a stuck RFCOMM close cannot
 	// freeze Snapshot/Send/readLoop bookkeeping during quit.
@@ -564,6 +580,42 @@ func (s *Session) Send(pkt spp.Packet, meta Meta) error {
 	s.mu.Unlock()
 
 	s.txMu.Lock()
+	if pkt.Cmd == spp.CmdSetSuperMic || pkt.Cmd == spp.CmdSetWalkieTalkie || pkt.Cmd == spp.CmdGetSuperMic || pkt.Cmd == spp.CmdGetWalkieTalkie {
+		s.mu.Lock()
+		err := spp.ValidateMicCommand(pkt, s.model)
+		if s.transport != transport {
+			err = fmt.Errorf("connection changed")
+		}
+		if err != nil {
+			delete(s.pending, fsn)
+		} else {
+			key := "walkie-talkie"
+			if pkt.Cmd == spp.CmdSetSuperMic || pkt.Cmd == spp.CmdGetSuperMic {
+				key = "super-mic"
+			}
+			delete(s.config, key)
+		}
+		s.mu.Unlock()
+		if err != nil {
+			s.txMu.Unlock()
+			return err
+		}
+	}
+	if pkt.Cmd == spp.CmdFindEarbud {
+		s.mu.Lock()
+		err := s.validateFindLocked(pkt.Payload, time.Now())
+		if s.transport != transport {
+			err = fmt.Errorf("connection changed")
+		}
+		if err != nil {
+			delete(s.pending, fsn)
+		}
+		s.mu.Unlock()
+		if err != nil {
+			s.txMu.Unlock()
+			return err
+		}
+	}
 	_, err := transport.Write(raw)
 	s.txMu.Unlock()
 
@@ -679,6 +731,10 @@ func (s *Session) openRawCaptureLocked() string {
 func (s *Session) readLoop(transport bt.Transport) {
 	s.publish(Event{Kind: EventProgress, Device: s.Snapshot().Device, Source: "read_loop", Trigger: "waiting for packets"})
 	s.mu.Lock()
+	if s.transport != transport {
+		s.mu.Unlock()
+		return
+	}
 	rawCapture := s.rawCapture
 	s.mu.Unlock()
 	var reader io.Reader = transport
@@ -698,8 +754,21 @@ func (s *Session) readLoop(transport bt.Transport) {
 			_ = s.finalizeDisconnect(transport, "read_loop", "read error", err)
 			return
 		}
-		s.handleRaw(raw)
+		if !s.handleTransportRaw(transport, raw) {
+			return
+		}
 	}
+}
+
+// Hold rxMu across both the identity check and all packet state updates.
+func (s *Session) handleTransportRaw(transport bt.Transport, raw []byte) bool {
+	s.rxMu.Lock()
+	defer s.rxMu.Unlock()
+	if !s.isCurrentTransport(transport) {
+		return false
+	}
+	s.handleRaw(raw)
+	return true
 }
 
 func (s *Session) isCurrentTransport(transport bt.Transport) bool {
@@ -734,6 +803,7 @@ func (s *Session) handleRaw(raw []byte) {
 		}
 		s.publish(Event{Kind: EventModel, Device: dev, Trace: *modelEvent, Source: "model", Trigger: modelEvent.Trigger})
 	}
+	s.recordEarbuds(parsed)
 	s.recordConfig(parsed)
 	s.updateDualList(parsed)
 	s.scheduleDualFollowups(parsed, pkt)

@@ -3,6 +3,9 @@ package tray
 // Options configures the tray runner.
 type Options struct {
 	AppName string
+	// OnRefresh and OnDisconnect route actions through the companion queue.
+	OnRefresh    func()
+	OnDisconnect func()
 	// OnReconnect, if set, is invoked by the "Reconnect" menu item to trigger an
 	// auto-discovery/connect attempt.
 	OnReconnect func()

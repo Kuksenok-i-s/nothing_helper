@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-APP_NAME="${APP_NAME:-tws_manager}"
+APP_NAME="${APP_NAME:-Nothing_helper}"
 VERSION="${VERSION:-0.1.0}"
 OUT_DIR="${OUT_DIR:-$ROOT/dist}"
 PREBUILT_BIN="${PREBUILT_BIN:-}"
@@ -18,7 +18,7 @@ if [[ -n "$PREBUILT_BIN" ]]; then
 	install -m 755 "$PREBUILT_BIN" "$BIN"
 else
 	echo "Building Gio binary for $(uname -m)..."
-	(cd "$ROOT" && CGO_ENABLED=1 go build -tags "gio systray" -o "$BIN" ./cmd/tws_manager_gio)
+	(cd "$ROOT" && CGO_ENABLED=1 go build -tags "gio systray" -o "$BIN" ./cmd/tws_manager)
 fi
 
 PLIST_SRC="$ROOT/packaging/macos/Info.plist.template"

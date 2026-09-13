@@ -12,6 +12,7 @@ import (
 // auto-detected models are re-detected for the new device.
 func (s *Session) clearLiveStateLocked() {
 	s.batteries = map[string]spp.Battery{}
+	s.earbuds = nil
 	s.config = map[string]string{}
 	s.dualList = nil
 	s.pending = map[byte]pendingTX{}
@@ -48,6 +49,21 @@ func cloneBatteries(src map[string]spp.Battery) map[string]spp.Battery {
 // recordConfig stores the latest decoded device configuration (ANC, low
 // latency, dual, EQ, spatial) so the UI can render it after auto-discovery.
 func (s *Session) recordConfig(parsed spp.ParsedPacket) {
+	if parsed.Kind == "super_mic_response" || parsed.Kind == "walkie_talkie_response" || parsed.Kind == "walkie_talkie_changed" {
+		key, flag := "walkie-talkie", parsed.WalkieTalkieEnabled
+		if parsed.Kind == "super_mic_response" {
+			key, flag = "super-mic", parsed.SuperMicEnabled
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if flag == nil {
+			delete(s.config, key)
+		} else {
+			s.config[key] = fmt.Sprintf("enabled=%t", *flag)
+		}
+		return
+	}
+
 	key, ok := configKeyForParsedKind(parsed.Kind)
 	if !ok {
 		return

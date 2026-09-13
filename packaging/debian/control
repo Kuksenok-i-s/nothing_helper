@@ -13,7 +13,8 @@ Rules-Requires-Root: no
 Package: tws-manager
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}, bluez, bluez-tools, policykit-1, libnotify-bin, libayatana-appindicator3-1
-Description: TWS RFCOMM desktop client
- tws_manager is a Linux desktop client for controlling Nothing and CMF
+Recommends: pipewire-bin
+Description: Nothing_helper desktop client
+ Nothing_helper is a Linux desktop client for controlling Nothing and CMF
  earbuds over Bluetooth RFCOMM, with tray integration, notifications,
  and safe protocol tooling.

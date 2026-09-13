@@ -13,13 +13,13 @@ import (
 
 func Run(ctx context.Context, s *session.Session, opts Options) {
 	if opts.AppName == "" {
-		opts.AppName = "tws_manager"
+		opts.AppName = "Nothing_helper"
 	}
 	systray.Run(func() { onReady(ctx, s, opts) }, func() {})
 }
 
 func onReady(ctx context.Context, s *session.Session, opts Options) {
-	systray.SetTitle("tws_manager")
+	systray.SetTitle("Nothing_helper")
 	if len(iconPNG) > 0 {
 		systray.SetIcon(iconPNG)
 	}
@@ -31,7 +31,7 @@ func onReady(ctx context.Context, s *session.Session, opts Options) {
 	battery.Disable()
 	systray.AddSeparator()
 
-	showWindow := systray.AddMenuItem("Show window", "Open the main window")
+	showWindow := systray.AddMenuItem("Open companion", "Open the compact controls")
 	if opts.OnShowWindow == nil {
 		showWindow.Hide()
 	}
@@ -42,7 +42,7 @@ func onReady(ctx context.Context, s *session.Session, opts Options) {
 	}
 	disconnect := systray.AddMenuItem("Disconnect", "Close active RFCOMM connection")
 	systray.AddSeparator()
-	quit := systray.AddMenuItem("Quit", "Quit tws_manager")
+	quit := systray.AddMenuItem("Quit", "Quit Nothing_helper")
 
 	events := s.Subscribe()
 	apply(s.Snapshot(), status, battery)
@@ -59,13 +59,21 @@ func onReady(ctx context.Context, s *session.Session, opts Options) {
 					opts.OnShowWindow()
 				}
 			case <-refresh.ClickedCh:
-				_ = s.SendCommand(spp.CmdGetBattery, session.Meta{Source: "tray", Trigger: "battery refresh"})
+				if opts.OnRefresh != nil {
+					opts.OnRefresh()
+				} else {
+					_ = s.SendCommand(spp.CmdGetBattery, session.Meta{Source: "tray", Trigger: "battery refresh"})
+				}
 			case <-reconnect.ClickedCh:
 				if opts.OnReconnect != nil {
 					go opts.OnReconnect()
 				}
 			case <-disconnect.ClickedCh:
-				_ = s.Close()
+				if opts.OnDisconnect != nil {
+					opts.OnDisconnect()
+				} else {
+					_ = s.Close()
+				}
 			case <-quit.ClickedCh:
 				if opts.OnQuit != nil {
 					opts.OnQuit()

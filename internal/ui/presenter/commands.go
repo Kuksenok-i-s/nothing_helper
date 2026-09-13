@@ -130,6 +130,8 @@ func buildToggleFeatures(found map[string]*togglePair) []ToggleFeature {
 func ToggleStateOn(feature, configValue string) bool {
 	v := strings.ToLower(configValue)
 	switch feature {
+	case "walkie-talkie", "super-mic":
+		return v == "enabled=true"
 	case "lag":
 		return strings.Contains(v, "low_latency=on")
 	case "spatial":

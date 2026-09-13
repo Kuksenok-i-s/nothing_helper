@@ -38,7 +38,9 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 	}
 
 	sess := session.New(logger, cfg.AllowUnsafe, cfg.ProbeEnabled)
-	sess.SetCaptureDir(cfg.CaptureDir)
+	if cfg.LogRaw {
+		sess.SetCaptureDir(cfg.CaptureDir)
+	}
 	if err := applyBootstrapModel(sess, logger, cfg.ModelName); err != nil {
 		return nil, err
 	}

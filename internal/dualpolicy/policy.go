@@ -116,5 +116,5 @@ func PromptText(phone spp.DualDevice) string {
 	if name == "" {
 		name = phone.MAC
 	}
-	return fmt.Sprintf("%s is using dual connection. Switch audio/control to this PC?", name)
+	return fmt.Sprintf("Сейчас активный источник — «%s». Переключить наушники на этот компьютер?", name)
 }

@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=tws_manager
+Name=Nothing_helper
 Comment=Control Nothing/CMF earbuds over Bluetooth RFCOMM
-Exec=/usr/bin/tws_manager_gio
+Exec=/usr/bin/tws_manager
 Icon=tws_manager
 Terminal=false
 Categories=AudioVideo;Utility;

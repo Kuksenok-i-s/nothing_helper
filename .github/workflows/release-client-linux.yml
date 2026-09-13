@@ -84,7 +84,7 @@ jobs:
             ls -la dist/ >&2 || true
             exit 1
           fi
-          sha256sum "${artifact}" > "${artifact}.sha256"
+          (cd dist && sha256sum "${artifact##*/}") > "${artifact}.sha256"
           echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload build artifact
@@ -142,7 +142,7 @@ jobs:
             ls -la dist/ >&2 || true
             exit 1
           fi
-          sha256sum "${artifact}" > "${artifact}.sha256"
+          (cd dist && sha256sum "${artifact##*/}") > "${artifact}.sha256"
           echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload build artifact
@@ -185,7 +185,7 @@ jobs:
       - name: Install build dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel go curl unzip fakeroot binutils zstd git pkgconf gtk3 vulkan-headers libayatana-appindicator
+          pacman -S --noconfirm base-devel go curl unzip fakeroot binutils zstd git pkgconf gtk3 vulkan-headers libayatana-appindicator bluez bluez-utils polkit libnotify libxkbcommon-x11
 
       - name: Build Arch package
         env:
@@ -203,7 +203,7 @@ jobs:
             ls -la dist/ packaging/arch/ >&2 || true
             exit 1
           fi
-          sha256sum "${artifact}" > "${artifact}.sha256"
+          (cd dist && sha256sum "${artifact##*/}") > "${artifact}.sha256"
           echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload build artifact
@@ -252,13 +252,13 @@ jobs:
         id: pkg
         run: |
           version="${{ steps.ver.outputs.version }}"
-          artifact="dist/tws_manager-${version}-linux-amd64.tar.gz"
+          artifact="dist/Nothing_helper-${version}-linux-amd64.tar.gz"
           if [[ ! -f "${artifact}" ]]; then
             echo "error: expected tarball not found: ${artifact}" >&2
             ls -la dist/ >&2 || true
             exit 1
           fi
-          sha256sum "${artifact}" > "${artifact}.sha256"
+          (cd dist && sha256sum "${artifact##*/}") > "${artifact}.sha256"
           echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload build artifact
@@ -308,11 +308,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: tws_manager v${{ needs.release-linux-deb-amd64.outputs.version }}
+          name: Nothing_helper v${{ needs.release-linux-deb-amd64.outputs.version }}
           files: |
             dist/deb-amd64/*
             dist/deb-arm64/*
             dist/arch-amd64/*
             dist/bundle/*
+          draft: true
           append_body: true
           generate_release_notes: true

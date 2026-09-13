@@ -59,24 +59,27 @@ func Run(ctx context.Context, cfg Config, fn func(context.Context, *Runtime) err
 		return err
 	}
 
-	// WithoutCancel keeps request-scoped values while allowing shutdown after
-	// the run context is cancelled. Keep this short: Session.Close already
-	// time-bounds RFCOMM teardown; we only need a moment for the logger flush.
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
-	defer shutdownCancel()
-
 	var once sync.Once
 	shutdown := func() {
 		once.Do(func() {
+			// WithoutCancel keeps request-scoped values while allowing shutdown after
+			// the run context is cancelled. Keep this short: Session.Close already
+			// time-bounds RFCOMM teardown; we only need a moment for the logger flush.
+			shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+			defer cancel()
 			_ = rt.Shutdown(shutdownCtx)
-			shutdownCancel()
 		})
 	}
 	defer shutdown()
 
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
-		<-ctx.Done()
-		shutdown()
+		select {
+		case <-ctx.Done():
+			shutdown()
+		case <-done:
+		}
 	}()
 
 	go StartPprof(ctx, cfg.PprofAddr)

@@ -1,5 +1,4 @@
 bin/tws_manager usr/bin/
-bin/tws_manager_gio usr/bin/
 bin/tws_manager_rfcomm_helper usr/libexec/
 packaging/common/tws_manager.desktop usr/share/applications/
 packaging/common/tws_manager-autostart.desktop etc/xdg/autostart/

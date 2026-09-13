@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,7 +40,7 @@ func TestEnsureDevicePerms(t *testing.T) {
 	if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureDevicePerms(path, "1000:1000"); err != nil {
+	if err := ensureDevicePerms(path, fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())); err != nil {
 		t.Fatalf("ensureDevicePerms() = %v", err)
 	}
 }
@@ -49,7 +50,7 @@ func TestWaitForDevice(t *testing.T) {
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := waitForDevice(path, 500); err != nil {
+	if err := waitForDevice(path, 500*time.Millisecond); err != nil {
 		t.Fatalf("waitForDevice() = %v", err)
 	}
 }

@@ -248,7 +248,7 @@ func TestParseDualConnectionFixture(t *testing.T) {
 		t.Fatalf("dual list summary = %q", got)
 	}
 	pkt = Packet{Cmd: CmdRspSupportedFeature, Payload: []byte{0x00, 0x40}}
-	if got := ParsePacket(pkt, DefaultModel()).Summary; got != "supported_features: dual_list=true payload=00 40" {
+	if got := ParsePacket(pkt, DefaultModel()).Summary; got != "supported_features: dual_list=true payload_bytes=2" {
 		t.Fatalf("supported feature summary = %q", got)
 	}
 	if !SupportedFeatureDualList(pkt.Payload) {
@@ -602,7 +602,7 @@ func TestParseScanCommand(t *testing.T) {
 func TestParseUnknownPacketText(t *testing.T) {
 	pkt := Packet{Cmd: 0x4999, Payload: []byte("hello")}
 	got := parseUnknownPacket(pkt, DefaultModel())
-	if got.Kind != "unknown_text" || !strings.Contains(got.Summary, "hello") {
+	if got.Kind != "unknown_text" || got.Text != "hello" || strings.Contains(got.Summary, "hello") {
 		t.Fatalf("parseUnknownPacket() = %+v", got)
 	}
 }
@@ -618,7 +618,7 @@ func TestParseUnknownPacketBatteryPairs(t *testing.T) {
 func TestParseUnknownPacketBinary(t *testing.T) {
 	pkt := Packet{Cmd: 0x4999, Payload: []byte{0xab, 0xcd, 0xef}}
 	got := parseUnknownPacket(pkt, DefaultModel())
-	if got.Kind != "unknown" || !strings.Contains(got.Summary, "bits=") {
+	if got.Kind != "unknown" || !strings.Contains(got.Summary, "payload_bytes=3") {
 		t.Fatalf("parseUnknownPacket() = %+v", got)
 	}
 }
@@ -642,5 +642,22 @@ func TestFeatureCommandPacketUnknown(t *testing.T) {
 	_, _, err := FeatureCommandPacket([]string{"nope"}, false, DefaultModel())
 	if err == nil {
 		t.Fatal("expected unknown command error")
+	}
+}
+
+func TestStructuredEarbudStatus(t *testing.T) {
+	pkt := Packet{Cmd: CmdRspStatus, Payload: []byte{2, 2, 0x84, 3, 0x80}}
+	got := ParsePacket(pkt, DefaultModel())
+	if !got.Earbuds["left"].InEar || !got.Earbuds["left"].Connected {
+		t.Fatal("left status incorrect")
+	}
+	if got.Earbuds["right"].InEar || !got.Earbuds["right"].Connected {
+		t.Fatal("right status incorrect")
+	}
+	for _, payload := range [][]byte{nil, {2, 2, 0x80}, {1, 4, 1}} {
+		got := ParsePacket(Packet{Cmd: CmdRspStatus, Payload: payload}, DefaultModel())
+		if len(got.Earbuds) != 0 {
+			t.Fatalf("missing or malformed sensor treated as out-of-ear: %v", payload)
+		}
 	}
 }

@@ -2,8 +2,8 @@
 
 | Topic | File |
 |-------|------|
-| TUI main | `cmd/tws_manager/main.go`, `preflight.go` |
-| Gio main | `cmd/tws_manager_gio/main.go` |
+| Companion entrypoint | `cmd/tws_manager/main.go` |
+| Compact GUI | `internal/ui/companion/view.go`, `pages.go` |
 | Flags / bootstrap | `internal/app/flags.go`, `bootstrap.go`, `entry.go` |
 | Session connect/TX/RX | `internal/session/session.go` |
 | Event publish | `internal/session/events_publish.go` |

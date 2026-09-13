@@ -49,6 +49,9 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Build companion with menu bar
+        run: go build -tags "gio systray" ./cmd/tws_manager
+
   linux-package-deb:
     name: Linux — Debian package (amd64)
     runs-on: ubuntu-latest
@@ -65,6 +68,11 @@ jobs:
 
       - name: Install build dependencies
         run: sudo make install-deps-debian
+
+      - name: Check companion GUI
+        run: |
+          go vet -tags gio ./internal/ui/companion
+          go test -race -tags gio ./internal/ui/companion
 
       - name: Build Debian package
         env:

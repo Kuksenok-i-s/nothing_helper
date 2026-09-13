@@ -205,7 +205,7 @@ func EnrichDeviceInfo(dev Device) Device {
 	if dev.MAC == "" {
 		return dev
 	}
-	info, err := BluetoothInfo(dev.MAC)
+	info, err := bluetoothInfoFn(dev.MAC)
 	if err != nil {
 		return dev
 	}

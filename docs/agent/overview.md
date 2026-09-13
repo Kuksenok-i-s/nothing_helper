@@ -10,7 +10,7 @@
 | RFCOMM | Bind/release/revive `/dev/rfcommN`, fix permissions |
 | Protocol | Custom Nothing SPP framing (SOF/CRC/FSN) |
 | Parsed data | Battery, status, identity, firmware, ANC, EQ, spatial, dual, lag |
-| UIs | TUI (Bubble Tea), GUI (Gio), system tray |
+| UI | Nothing Companion (Gio), system tray |
 | Safety | GET + validated UI SET by default; `--unsafe` for raw scan / other SET |
 | Logging | NDJSON trace + JSON export (`captures/`) |
 
@@ -18,17 +18,16 @@
 
 | Binary | Path | Build tags | Role |
 |--------|------|------------|------|
-| `tws_manager` | `cmd/tws_manager/main.go` | optional `systray` | TUI + stdin RFCOMM preflight |
-| `tws_manager_gio` | `cmd/tws_manager_gio/main.go` | `gio`, optional `systray` | GUI |
+| `tws_manager` | `cmd/tws_manager/main.go` | `gio`, optional `systray` | Compact companion GUI |
 | `tws_manager_rfcomm_helper` | `cmd/tws_manager_rfcomm_helper/main.go` | — | polkit helper |
 
 Minimal entrypoint pattern:
 
 ```go
-cfg, _ := app.ConfigFromFlags(app.RegisterFlags(fs, app.ProfileCLI))
+cfg, _ := app.ConfigFromFlags(app.RegisterFlags(fs, app.ProfileGUI))
 app.Run(ctx, cfg, func(ctx context.Context, rt *app.Runtime) error {
     services, _ := app.WireServices(ctx, rt)
-    return tui.Run(ctx, rt.Session, tui.Options{Manager: services.Manager, /* … */})
+    return companion.Run(ctx, companion.Options{Manager: services.Manager, /* … */})
 })
 ```
 

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-APP_NAME="${APP_NAME:-tws_manager}"
+APP_NAME="${APP_NAME:-Nothing_helper}"
 VERSION="${VERSION:-0.1.0}"
 OUT_DIR="${OUT_DIR:-$ROOT/dist}"
 APP="$OUT_DIR/$APP_NAME.app"

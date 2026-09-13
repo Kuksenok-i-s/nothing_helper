@@ -96,3 +96,28 @@ func TestParseEQModeArgAndBuildPayload(t *testing.T) {
 		t.Fatalf("BuildEQSetPayload() = %v, %v", payload, err)
 	}
 }
+
+func TestFindPayloadValidation(t *testing.T) {
+	for _, p := range [][]byte{nil, {2}, {2, 2}, {4, 1}, {2, 1, 0}} {
+		if ValidateFindPayload(p) == nil {
+			t.Fatalf("accepted malformed find payload %v", p)
+		}
+	}
+	for _, side := range []string{"left", "right"} {
+		for _, enabled := range []bool{false, true} {
+			p, err := FindPayload(side, enabled)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ValidateFindPayload(p); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if _, err := FindPayload("both", true); err == nil {
+		t.Fatal("unbounded side accepted")
+	}
+	if SupportsFind(DefaultModel()) {
+		t.Fatal("unknown model must not ring")
+	}
+}
