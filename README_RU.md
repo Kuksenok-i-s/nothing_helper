@@ -8,12 +8,21 @@
 <p align="center"><strong>Компактное приложение для наушников Nothing / CMF на Linux и macOS. Заряд, ANC, эквалайзер, поиск наушников и управление кнопкой TALK — с компьютера.</strong></p>
 <p align="center"><a href="https://github.com/Kuksenok-i-s/nothing_helper/releases/latest">Скачать последнюю версию</a> · <a href="LICENSE">MIT</a></p>
 
+<p align="center"><strong>English</strong> · <strong>Русский</strong></p>
 <p align="center">
-  <img src="pics/companion.png" width="350" alt="Nothing_helper — dark theme">
-  <img src="pics/companion-light.png" width="350" alt="Nothing_helper — light theme">
+  <img src="pics/companion-en-dark.png" width="350" alt="Nothing_helper — English interface, dark theme, language settings">
+  <img src="pics/companion-ru-dark.png" width="350" alt="Nothing_helper — русский интерфейс, тёмная тема, настройки языка">
 </p>
 
-Тёмная и светлая темы. Скриншоты интерфейса с демонстрационными данными.
+<details>
+<summary>Светлая тема — English / Русский</summary>
+<p align="center">
+  <img src="pics/companion-en-light.png" width="350" alt="Nothing_helper — English interface, light theme">
+  <img src="pics/companion-ru-light.png" width="350" alt="Nothing_helper — русский интерфейс, светлая тема">
+</p>
+</details>
+
+Английский и русский интерфейсы с выбором языка внутри «Все настройки». На скриншотах демонстрационные данные; светлая тема доступна в раскрывающемся блоке выше.
 
 Независимый проект сообщества, не связанный с Nothing Technology Limited, возможности зависят от модели.
 
@@ -64,6 +73,8 @@ make run ARGS="--addr AA:BB:CC:DD:EE:FF --channel 15"
 ```
 
 Выберите наушники на вкладке «Устройства»; подключение и настройка RFCOMM выполняются в фоне. Исполняемый файл называется `nothing_helper`; окно и приложение macOS называются **Nothing_helper**.
+
+По умолчанию GUI открывается на английском. В **All settings → Interface language** выберите **Русский**; после переключения раздел называется **Все настройки → Язык интерфейса**. Выбор применяется сразу, доступен без подключения наушников и сохраняется в `nothing_helper/interface.json` внутри системного каталога настроек пользователя. Технический журнал остаётся в исходном виде.
 
 ## Варианты сборки
 
@@ -193,14 +204,14 @@ Feature-команды в UI: `anc`, `eq`, `spatial`, `lag`, `dual` - с учё�
 Сборка пакетов выполняется на целевой ОС, из корня репозитория:
 
 ```bash
-make package-deb PKG_VERSION=1.2.0
-# dist/nothing-helper_1.2.0-1_<arch>.deb
-make bundle-linux PKG_VERSION=1.2.0
-# dist/Nothing_helper-1.2.0-linux-<arch>.tar.gz
-make macos-app VERSION=1.2.0
+make package-deb PKG_VERSION=1.2.2
+# dist/nothing-helper_1.2.2-1_<arch>.deb
+make bundle-linux PKG_VERSION=1.2.2
+# dist/Nothing_helper-1.2.2-linux-<arch>.tar.gz
+make macos-app VERSION=1.2.2
 # dist/Nothing_helper.app (native architecture)
-make package-macos VERSION=1.2.0
-# dist/Nothing_helper-1.2.0-universal.dmg (Intel + Apple Silicon)
+make package-macos VERSION=1.2.2
+# dist/Nothing_helper-1.2.2-universal.dmg (Intel + Apple Silicon)
 ```
 
 Linux-пакет и архив собираются для архитектуры текущего Go toolchain (`go env GOARCH`). `ARCH` не включает кросс-компиляцию; для arm64 используйте arm64-систему с соответствующими CGO-зависимостями. Архив содержит только GUI и helper, без системных библиотек и установки polkit. `make client-bundle-linux` сохранён как алиас `make bundle-linux`.
@@ -211,7 +222,7 @@ Linux-пакет и архив собираются для архитектур�
 
 RPM — отдельный рецепт для Fedora: `make package-rpm` требует настроенного дерева `rpmbuild`, версии в `packaging/fedora/nothing_helper.spec` и исходного архива `nothing_helper-<version>.tar.gz` в его каталоге `SOURCES`. Результаты находятся в каталоге `RPMS` дерева rpmbuild; в релиз v1.2.0 RPM не входит.
 
-Для локальной сборки задавайте версию явно, как выше. Без неё Debian и Linux-архив используют `APP_VERSION`, тег из `GITHUB_REF` в CI либо `0.0.0~dev.<sha>`; локальный checkout тега сам по себе не задаёт версию. Скрипты macOS без `VERSION` используют `0.1.0`. Версию Arch/RPM задаёт соответствующий рецепт.
+Для локальной сборки задавайте версию явно, как выше. Без неё Debian и Linux-архив используют `APP_VERSION`, тег из `GITHUB_REF` в CI либо `0.0.0~dev.<sha>`; локальный checkout тега сам по себе не задаёт версию. Скрипты macOS без `VERSION` используют `1.2.2`. Версию Arch/RPM задаёт соответствующий рецепт.
 
 ### Post-install (rootless)
 
@@ -267,8 +278,8 @@ GitHub Actions в `.github/workflows/`:
 Релиз:
 
 ```bash
-git tag -a v1.2.1 -m "Nothing_helper v1.2.1"  # example: choose an unused version
-git push origin v1.2.1
+git tag -a v1.2.3 -m "Nothing_helper v1.2.3"  # example: choose an unused version
+git push origin v1.2.3
 ```
 
 Оба release-workflow прикрепляют артефакты к одному черновику GitHub Release; публикуйте его после проверки всех сборок (`Nothing_helper v<version>`). Ручной запуск: **Actions → Release Linux client / Release macOS client → Run workflow** (опционально переопределить версию).

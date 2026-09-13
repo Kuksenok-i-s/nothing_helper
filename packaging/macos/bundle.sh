@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 APP_NAME="${APP_NAME:-Nothing_helper}"
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-1.2.2}"
 OUT_DIR="${OUT_DIR:-$ROOT/dist}"
 PREBUILT_BIN="${PREBUILT_BIN:-}"
 BIN="$OUT_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME"

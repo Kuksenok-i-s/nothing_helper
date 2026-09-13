@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestMain(m *testing.M) {
@@ -80,7 +81,7 @@ func TestWaitForDeviceFindsExistingFile(t *testing.T) {
 	if err := writeTestFile(path); err != nil {
 		t.Fatal(err)
 	}
-	if err := waitForDevice(path, 500); err != nil {
+	if err := waitForDevice(path, 500*time.Millisecond); err != nil {
 		t.Fatalf("waitForDevice() = %v", err)
 	}
 }

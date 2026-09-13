@@ -4,12 +4,21 @@ English · **[Русская версия](README_RU.md)**
 <p align="center"><strong>A compact desktop app for Nothing / CMF earbuds on Linux and macOS. Battery, ANC, EQ, earbud finding, and TALK button controls — from your computer.</strong></p>
 <p align="center"><a href="https://github.com/Kuksenok-i-s/nothing_helper/releases/latest">Download the latest release</a> · <a href="LICENSE">MIT</a></p>
 
+<p align="center"><strong>English</strong> · <strong>Русский</strong></p>
 <p align="center">
-  <img src="pics/companion.png" width="350" alt="Nothing_helper — dark theme">
-  <img src="pics/companion-light.png" width="350" alt="Nothing_helper — light theme">
+  <img src="pics/companion-en-dark.png" width="350" alt="Nothing_helper — English interface, dark theme, language settings">
+  <img src="pics/companion-ru-dark.png" width="350" alt="Nothing_helper — русский интерфейс, тёмная тема, настройки языка">
 </p>
 
-Dark and light themes. Interface screenshots use demonstration data.
+<details>
+<summary>Light theme — English / Русский</summary>
+<p align="center">
+  <img src="pics/companion-en-light.png" width="350" alt="Nothing_helper — English interface, light theme">
+  <img src="pics/companion-ru-light.png" width="350" alt="Nothing_helper — русский интерфейс, светлая тема">
+</p>
+</details>
+
+English and Russian interfaces with the language selector inside All settings. Screenshots use demonstration data; expand the section above to see the light theme.
 
 The executable is `nothing_helper`, the Debian package is `nothing-helper`, and the application is **Nothing_helper**.
 
@@ -62,6 +71,8 @@ make run ARGS="--addr AA:BB:CC:DD:EE:FF --channel 15"
 ```
 
 Select the earbuds on the Devices tab; connection and RFCOMM setup run in the background. The executable is `nothing_helper`; the window and macOS app are named **Nothing_helper**.
+
+The GUI starts in English. Open **All settings → Interface language** to switch between English and Русский. The choice is saved in `nothing_helper/interface.json` under your system user configuration directory and applies immediately, even without connected earbuds. Technical logs retain their original text.
 
 ## Build variants
 
@@ -191,14 +202,14 @@ Packaging artifacts live under `packaging/`:
 Build packages on the target OS, from the repository root:
 
 ```bash
-make package-deb PKG_VERSION=1.2.0
-# dist/nothing-helper_1.2.0-1_<arch>.deb
-make bundle-linux PKG_VERSION=1.2.0
-# dist/Nothing_helper-1.2.0-linux-<arch>.tar.gz
-make macos-app VERSION=1.2.0
+make package-deb PKG_VERSION=1.2.2
+# dist/nothing-helper_1.2.2-1_<arch>.deb
+make bundle-linux PKG_VERSION=1.2.2
+# dist/Nothing_helper-1.2.2-linux-<arch>.tar.gz
+make macos-app VERSION=1.2.2
 # dist/Nothing_helper.app (native architecture)
-make package-macos VERSION=1.2.0
-# dist/Nothing_helper-1.2.0-universal.dmg (Intel + Apple Silicon)
+make package-macos VERSION=1.2.2
+# dist/Nothing_helper-1.2.2-universal.dmg (Intel + Apple Silicon)
 ```
 
 Linux packages and bundles use the current Go toolchain architecture (`go env GOARCH`). `ARCH` does not enable cross-compilation; use an arm64 host with matching CGO dependencies for arm64 builds. The tarball contains only the GUI and helper, without system libraries or polkit installation. `make client-bundle-linux` remains an alias for `make bundle-linux`.
@@ -209,7 +220,7 @@ For Arch, install dependencies with `make install-deps-arch`, set `pkgver` in `p
 
 RPM is a separate Fedora recipe: `make package-rpm` requires a prepared `rpmbuild` tree, a version in `packaging/fedora/nothing_helper.spec`, and the matching `nothing_helper-<version>.tar.gz` source archive in its `SOURCES` directory. Outputs go to the rpmbuild tree's `RPMS` directory; v1.2.0 does not include an RPM asset.
 
-Set local package versions explicitly as above. Without an override, Debian and Linux bundles use `APP_VERSION`, a tag from `GITHUB_REF` in CI, or `0.0.0~dev.<sha>`; checking out a tag locally does not set the version. macOS scripts default to `0.1.0` without `VERSION`. Arch/RPM versions come from their recipes.
+Set local package versions explicitly as above. Without an override, Debian and Linux bundles use `APP_VERSION`, a tag from `GITHUB_REF` in CI, or `0.0.0~dev.<sha>`; checking out a tag locally does not set the version. macOS scripts default to `1.2.2` without `VERSION`. Arch/RPM versions come from their recipes.
 
 ### Post-install (rootless)
 
@@ -265,8 +276,8 @@ GitHub Actions workflows under `.github/workflows/`:
 Cut a release:
 
 ```bash
-git tag -a v1.2.1 -m "Nothing_helper v1.2.1"  # example: choose an unused version
-git push origin v1.2.1
+git tag -a v1.2.3 -m "Nothing_helper v1.2.3"  # example: choose an unused version
+git push origin v1.2.3
 ```
 
 Both release workflows attach artifacts to the same draft GitHub Release; publish it after verifying all artifacts (`Nothing_helper v<version>`). Manual runs: **Actions → Release Linux client / Release macOS client → Run workflow** (optional version override).

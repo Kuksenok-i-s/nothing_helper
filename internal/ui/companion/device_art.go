@@ -60,12 +60,12 @@ func (v *view) deviceArt(gtx layout.Context, c *Controller, s Snapshot) layout.D
 					}
 				}
 				return click.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					name := "Найти левый наушник"
+					name := v.tr("Найти левый наушник")
 					if side == "right" {
-						name = "Найти правый наушник"
+						name = v.tr("Найти правый наушник")
 					}
 					if active {
-						name = "Остановить поиск"
+						name = v.tr("Остановить поиск")
 					}
 					semantic.LabelOp(name).Add(gtx.Ops)
 					if active {
@@ -84,13 +84,13 @@ func (v *view) deviceArt(gtx layout.Context, c *Controller, s Snapshot) layout.D
 			})
 			at(118, 58, 10, func(gtx layout.Context) layout.Dimensions {
 				color := v.p.muted
-				label := "Положение неизвестно"
+				label := v.tr("Положение неизвестно")
 				if known {
 					color = hex(0xed4945)
-					label = "Вне уха"
+					label = v.tr("Вне уха")
 					if state.InEar {
 						color = hex(0x44cd69)
-						label = "В ухе"
+						label = v.tr("В ухе")
 					}
 				}
 				semantic.DescriptionOp(label).Add(gtx.Ops)
@@ -104,7 +104,7 @@ func (v *view) deviceArt(gtx layout.Context, c *Controller, s Snapshot) layout.D
 			sub := gtx
 			sub.Constraints = layout.Exact(image.Pt(size.X, gtx.Dp(22)))
 			layout.Center.Layout(sub, func(gtx layout.Context) layout.Dimensions {
-				return v.label(gtx, 14, fmt.Sprintf("Кейс %d%%", charge), false)
+				return v.label(gtx, 14, fmt.Sprintf(v.tr("Кейс %d%%"), charge), false)
 			})
 			off.Pop()
 		}
