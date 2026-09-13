@@ -50,7 +50,7 @@ func TestWaitForDevice(t *testing.T) {
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := waitForDevice(path, 500); err != nil {
+	if err := waitForDevice(path, 500*time.Millisecond); err != nil {
 		t.Fatalf("waitForDevice() = %v", err)
 	}
 }
