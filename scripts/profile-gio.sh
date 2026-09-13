@@ -18,7 +18,7 @@ PROFILE_ADDR="${PROFILE_ADDR:-127.0.0.1:6060}"
 PROFILE_SECONDS="${PROFILE_SECONDS:-20}"
 PROFILE_WAIT="${PROFILE_WAIT:-5}"
 OUT_DIR="${PROFILE_OUT_DIR:-captures/profiles}"
-BINARY="${PROFILE_BINARY:-bin/tws_manager}"
+BINARY="${PROFILE_BINARY:-bin/nothing_helper}"
 TAGS="${PROFILE_TAGS:-gio}"
 PID_FILE="$OUT_DIR/gio.pid"
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -27,7 +27,7 @@ OUT_PROF="$OUT_DIR/cpu-${STAMP}.prof"
 mkdir -p "$OUT_DIR"
 
 echo "==> building $BINARY (tags: $TAGS)"
-go build -tags "$TAGS" -o "$BINARY" ./cmd/tws_manager
+go build -tags "$TAGS" -o "$BINARY" ./cmd/nothing_helper
 
 if [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
   echo "error: stale profile run detected (pid $(cat "$PID_FILE")); remove $PID_FILE or kill the process" >&2
@@ -87,7 +87,7 @@ go tool pprof -top "$OUT_PROF" | head -40
 if [[ -f "${OUT_SAMPLE:-}" ]]; then
   echo ""
   echo "==> hot symbols (macOS sample, includes native IOBluetooth/CFRunLoop)"
-  rg -n "tws_manager|gioui|IOBluetooth|CFRunLoop|bt_transport|runtime\." "$OUT_SAMPLE" | head -30 || true
+  rg -n "nothing_helper|gioui|IOBluetooth|CFRunLoop|bt_transport|runtime\." "$OUT_SAMPLE" | head -30 || true
 fi
 
 echo ""

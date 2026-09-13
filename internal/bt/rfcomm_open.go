@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"tws_manager/internal/security"
+	"nothing_helper/internal/security"
 )
 
 var (

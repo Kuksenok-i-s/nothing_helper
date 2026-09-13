@@ -1,95 +1,94 @@
-# macOS packaging
+# Nothing_helper — macOS build and packaging
 
-Build a universal (Apple Silicon + Intel) `.app` bundle and DMG installer.
-
-**Note:** On macOS the tray uses a native `NSStatusItem` (not `getlantern/systray`), because that library's `NSApplication` loop conflicts with Gio and crashes at startup. Linux uses AppIndicator via `getlantern/systray`.
+Run all commands from the repository root. The GUI uses Gio, Bluetooth uses IOBluetooth, and the menu bar uses native `NSStatusItem`. Linux libraries such as BlueZ and AppIndicator are not required on macOS.
 
 ## Prerequisites
 
-- macOS 11+
-- Xcode Command Line Tools (`xcode-select --install`)
-- Go 1.26+ with `CGO_ENABLED=1` (required by systray)
-- Paired Nothing/CMF device for live Bluetooth tests
+- Go 1.26+ and Xcode Command Line Tools (`xcode-select --install`).
+- A macOS version supported by the installed Go toolchain and Xcode SDK.
+- CGO enabled: `go env CGO_ENABLED` should print `1`.
+- Earbuds paired in system Bluetooth settings for live testing.
 
-## Quick build (recommended)
-
-From the repo root:
+## Development
 
 ```bash
-make package-macos
+make help
+make build                         # native executable: bin/nothing_helper
+make run                           # GUI with menu bar
+make run-lite                      # GUI without menu bar; exits on window close
+make run ARGS="--addr AA:BB:CC:DD:EE:FF --channel 15"
+make check-gui                     # vet + race tests with gio systray
 ```
 
-Output:
+Equivalent direct command: `go run -tags "gio systray" ./cmd/nothing_helper`.
+The old TUI and separate Gio entrypoint were removed. `make run-gio` and `make build-gio` are compatibility aliases. The `nowayland` tag is only useful for selecting X11/XWayland on Linux; macOS uses native window decorations already.
 
-| Artifact | Path |
-|----------|------|
-| Universal binary | `dist/build/macos/tws_manager-universal` |
-| App bundle | `dist/Nothing_helper.app` |
-| DMG installer | `dist/Nothing_helper-0.1.0-universal.dmg` |
-
-Install: open the DMG and drag **Nothing_helper.app** to **Applications**.
-
-Custom version:
+## Native .app
 
 ```bash
-VERSION=0.2.0 make package-macos
-# -> dist/Nothing_helper-0.2.0-universal.dmg
+make macos-app VERSION=1.2.0
+open dist/Nothing_helper.app
+```
+
+This builds for the host architecture and assembles `dist/Nothing_helper.app`. Its executable is `Contents/MacOS/Nothing_helper`; the unbundled development executable is `bin/nothing_helper`.
+
+## Universal installer (Apple Silicon + Intel)
+
+```bash
+make package-macos VERSION=1.2.0
+open dist/Nothing_helper-1.2.0-universal.dmg
+```
+
+Outputs:
+
+- `dist/build/macos/nothing_helper-universal` — combined arm64 and x86_64 binary.
+- `dist/Nothing_helper.app` — universal application bundle.
+- `dist/Nothing_helper-1.2.0-universal.dmg` — installer with an Applications shortcut.
+
+Drag **Nothing_helper.app** to **Applications**. Always pass `VERSION` for local packaging; scripts default to `0.1.0`. In CI, the workflow resolves the tag or manual version input and passes `VERSION` to Make. These builds require macOS and the Xcode SDK; setting `GOOS=darwin` on Linux is insufficient for the native frameworks.
+
+Verify the bundle:
+
+```bash
+lipo -info dist/Nothing_helper.app/Contents/MacOS/Nothing_helper
+codesign --verify --deep --strict dist/Nothing_helper.app
 ```
 
 ## Scripts
 
-| Script | Purpose |
-|--------|---------|
-| `build-universal.sh` | Build `arm64` + `amd64`, merge with `lipo` |
-| `bundle.sh` | Assemble `.app`, generate `.icns`, ad-hoc sign |
-| `mk-dmg.sh` | Create compressed DMG with Applications symlink |
-| `package.sh` | Run all steps above |
+- `build-universal.sh` builds arm64 and amd64, then merges them with `lipo`.
+- `bundle.sh` assembles `.app`, generates `.icns`, and ad-hoc signs the app; used by `make macos-app`.
+- `mk-dmg.sh` creates the compressed DMG.
+- `package.sh` runs all universal packaging steps; used by `make package-macos`.
 
-Local dev bundle (native arch only, no DMG):
+## Bluetooth diagnostics and profiling
 
-```bash
-./packaging/macos/bundle.sh
-open dist/Nothing_helper.app
-```
-
-## Architecture
-
-The universal binary contains both slices:
+Use the Devices and Diagnostics tabs in the application to check connection, battery responses, and export a session. For raw protocol tracing:
 
 ```bash
-lipo -info dist/build/macos/tws_manager-universal
-# Architectures in the fat file: ... are: x86_64 arm64
+make run ARGS="--addr AA:BB:CC:DD:EE:FF --channel 15 --log captures/session.ndjson --log-raw"
 ```
 
-Cross-compilation uses the Xcode SDK; build on a Mac with CLT installed.
-
-## Hardware spike
-
-Before relying on the GUI for connect, verify RFCOMM with:
+For a running installed app, capture a macOS stack sample:
 
 ```bash
-go build -o bin/spp_spike ./cmd/spp_spike
-./bin/spp_spike --addr AA:BB:CC:DD:EE:FF --channel 15
+make sample-macos-app PROFILE_SECONDS=20
+# For an unbundled development process instead:
+make sample-macos-app MACOS_PROCESS=nothing_helper PROFILE_SECONDS=20
 ```
 
-Pass criteria: parsed GET_BATTERY response within the timeout.
+The old `cmd/spp_spike` utility is no longer present; use the application's diagnostics instead.
 
-Scan all RFCOMM channels (1s timeout per channel):
+## Permissions and signing
 
-```bash
-chmod +x scripts/macos-rfcomm-scan.sh
-./scripts/macos-rfcomm-scan.sh --addr AA:BB:CC:DD:EE:FF --build
-./scripts/macos-rfcomm-scan.sh --addr AA:BB:CC:DD:EE:FF --from 14 --to 16 --probe battery
-```
-
-## Permissions
-
-First Bluetooth API use triggers the macOS Privacy → Bluetooth prompt. Denied permission surfaces as connect errors in the UI/log.
-
-## Notarization (optional)
-
-For distribution outside your machine, sign with a Developer ID certificate and notarize via `notarytool`. Ad-hoc signing (`codesign -s -`) is sufficient for local development.
+Allow Bluetooth access when macOS prompts for it. Denied access appears as connection errors. The distributed app is ad-hoc signed, not notarized with an Apple Developer ID. Developer ID signing and notarization require separate credentials and are not performed by these Make targets.
 
 ## CI release
 
-On tag `v*` (or manual **Actions → Release macOS client**), GitHub Actions runs `make package-macos` on `macos-14` and publishes `dist/Nothing_helper-<version>-universal.dmg` to GitHub Releases. Version comes from [scripts/pkg-version.sh](../../scripts/pkg-version.sh).
+A new `v*` tag starts the Linux and macOS release workflows. The macOS workflow tests the GUI, builds the universal DMG, and attaches it plus a SHA-256 file to a draft GitHub Release. Publish the draft after both platforms finish and their artifacts are verified. Manual workflow runs upload Actions artifacts but do not publish a release.
+
+After downloading both files into the same directory:
+
+```bash
+shasum -a 256 -c Nothing_helper-1.2.0-universal.dmg.sha256
+```

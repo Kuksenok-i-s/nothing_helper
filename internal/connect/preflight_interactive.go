@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"tws_manager/internal/bt"
+	"nothing_helper/internal/bt"
 )
 
 var preflightTestHooksVar *preflightTestHooks

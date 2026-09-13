@@ -24,7 +24,7 @@ Do not open files to "explore". Query the index first; read only files returned 
 |------|------|
 | File imports/dependents | `codebase_graph_query { filePath: "internal/session/session.go" }` |
 | Blast radius before rename | `codebase_impact { target: "Connect" }` |
-| Call flow from entry | `codebase_flow { entrypoint: "cmd/tws_manager/main.go" }` |
+| Call flow from entry | `codebase_flow { entrypoint: "cmd/nothing_helper/main.go" }` |
 | Index stale? | `codebase_status { projectPath: "…" }` |
 
 ## When grep is better

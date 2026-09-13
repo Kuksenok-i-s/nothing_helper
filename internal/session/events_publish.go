@@ -1,6 +1,6 @@
 package session
 
-import "tws_manager/internal/trace"
+import "nothing_helper/internal/trace"
 
 func (s *Session) publish(event Event) {
 	s.logPublishedEvent(event)

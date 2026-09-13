@@ -13,7 +13,7 @@ import (
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/spp"
 )
 
 func (v *view) deviceArt(gtx layout.Context, c *Controller, s Snapshot) layout.Dimensions {

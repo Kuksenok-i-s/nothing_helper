@@ -1,6 +1,6 @@
 # Security
 
-tws_manager is a **local** Bluetooth RFCOMM client. It runs on your machine, talks to paired earbuds over `/dev/rfcommN`, and uses either a `polkit` helper (recommended) or `sudo` fallback for privileged RFCOMM operations.
+nothing_helper is a **local** Bluetooth RFCOMM client. It runs on your machine, talks to paired earbuds over `/dev/rfcommN`, and uses either a `polkit` helper (recommended) or `sudo` fallback for privileged RFCOMM operations.
 
 Project status: unofficial client. Nothing/CMF names and logos are trademarks of their respective owners.
 
@@ -26,7 +26,7 @@ Privileged operations are:
 
 Supported runtime modes (`--privilege-helper`):
 
-- `polkit`: execute `/usr/libexec/tws_manager_rfcomm_helper` via `pkexec`
+- `polkit`: execute `/usr/libexec/nothing_helper_rfcomm_helper` via `pkexec`
 - `sudo` (default in TUI): keeps legacy behavior with `sudo -v` warmup
 - `auto` (default in Gio): try `polkit`, fallback to `sudo`; Gio asks for the sudo password in the window when needed
 - `none`: disable privileged fallback completely
@@ -35,7 +35,7 @@ Arbitrary root commands are not exposed from application code.
 
 ### Polkit helper hardening
 
-Helper command: `cmd/tws_manager_rfcomm_helper`.
+Helper command: `cmd/nothing_helper_rfcomm_helper`.
 
 Allowed actions only:
 
@@ -47,9 +47,9 @@ All action arguments are validated (`/dev/rfcommN`, MAC format, channel range, o
 
 Packaging artifacts:
 
-- `packaging/common/org.tws_manager.rfcomm.policy`
-- `packaging/common/90-tws_manager.rules`
-- `packaging/common/tws_manager.sysusers`
+- `packaging/common/org.nothing_helper.rfcomm.policy`
+- `packaging/common/90-nothing_helper.rules`
+- `packaging/common/nothing_helper.sysusers`
 
 ### Optional legacy sudoers (NOPASSWD)
 
@@ -69,13 +69,13 @@ A broad `NOPASSWD: ALL` is discouraged. Even with NOPASSWD, the app only invokes
 - `--channel` must be 1–30
 - `--log` and `--capture-dir` must be absolute-safe paths (no `..` segments)
 
-Saved mapping `~/.config/tws_manager/devices.json` is sanitized on load: invalid keys/MACs are dropped.
+Saved mapping `~/.config/nothing_helper/devices.json` is sanitized on load: invalid keys/MACs are dropped.
 
 ## File permissions
 
 | Path | Mode |
 |------|------|
-| `~/.config/tws_manager/` | `0700` |
+| `~/.config/nothing_helper/` | `0700` |
 | `devices.json`, NDJSON logs, exports | `0600` |
 | `captures/` parent dirs | `0700` |
 

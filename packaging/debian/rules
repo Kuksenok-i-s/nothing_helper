@@ -7,8 +7,8 @@ export GOFLAGS=
 	dh $@
 
 override_dh_auto_build:
-	go build -tags "gio systray" -o bin/tws_manager ./cmd/tws_manager
-	go build -o bin/tws_manager_rfcomm_helper ./cmd/tws_manager_rfcomm_helper
+	go build -tags "gio systray" -o bin/nothing_helper ./cmd/nothing_helper
+	go build -o bin/nothing_helper_rfcomm_helper ./cmd/nothing_helper_rfcomm_helper
 
 override_dh_auto_test:
 	go test ./...

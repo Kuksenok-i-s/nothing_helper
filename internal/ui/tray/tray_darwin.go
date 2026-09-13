@@ -5,9 +5,9 @@ package tray
 import (
 	"context"
 
-	"tws_manager/internal/session"
-	"tws_manager/internal/spp"
-	"tws_manager/internal/ui/tray/macosnative"
+	"nothing_helper/internal/session"
+	"nothing_helper/internal/spp"
+	"nothing_helper/internal/ui/tray/macosnative"
 )
 
 const (

@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"tws_manager/internal/security"
+	"nothing_helper/internal/security"
 )
 
 var (

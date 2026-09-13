@@ -14,7 +14,7 @@ func ConfigPath() string {
 		return configPathOverride()
 	}
 	if dir, err := os.UserConfigDir(); err == nil {
-		return filepath.Join(dir, "tws_manager", "devices.json")
+		return filepath.Join(dir, "nothing_helper", "devices.json")
 	}
 	return filepath.Join(".", "devices.json")
 }
@@ -26,6 +26,13 @@ func LoadConfig(path string) (Config, error) {
 func loadConfigFromDisk(path string) (Config, error) {
 	cfg := Config{Devices: map[string]string{}, Channels: map[string]int{}}
 	data, err := os.ReadFile(path)
+	// Read the previous app's settings only when the new default file is absent.
+	// SaveConfig always writes to the new path, so subsequent edits migrate it.
+	if os.IsNotExist(err) {
+		if dir, configErr := os.UserConfigDir(); configErr == nil && path == filepath.Join(dir, "nothing_helper", "devices.json") {
+			data, err = os.ReadFile(filepath.Join(dir, "tws_manager", "devices.json"))
+		}
+	}
 	if os.IsNotExist(err) {
 		return cfg, nil
 	}

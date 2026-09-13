@@ -20,7 +20,7 @@ import (
 // CLI binary) it falls back to osascript.
 func New(appName, icon string) *Notifier {
 	if appName == "" {
-		appName = "tws_manager"
+		appName = "nothing_helper"
 	}
 	if icon == "" {
 		icon = "audio-headphones"

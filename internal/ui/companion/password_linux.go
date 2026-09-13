@@ -2,6 +2,6 @@
 
 package companion
 
-import "tws_manager/internal/bt"
+import "nothing_helper/internal/bt"
 
 func configurePasswordProvider(c *Controller) { bt.ConfigureSudoPasswordProvider(c.Password) }

@@ -28,3 +28,6 @@ packaging/arch/*.pkg.tar.*
 packaging/debian/changelog
 scripts/node_modules/
 scripts/macos/.venv/
+/nothing_helper
+/nothing_helper_rfcomm_helper
+/nothing_helper_gio

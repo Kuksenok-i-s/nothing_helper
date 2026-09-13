@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
-	"tws_manager/internal/bt"
-	"tws_manager/internal/security"
+	"nothing_helper/internal/bt"
+	"nothing_helper/internal/security"
 )
 
 // RFCOMMExists on Darwin reports true when a MAC or transport ref is configured.

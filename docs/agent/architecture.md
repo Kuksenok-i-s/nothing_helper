@@ -5,9 +5,9 @@
 ```mermaid
 flowchart TB
   subgraph entry [Entrypoints]
-    TUI[cmd/tws_manager]
-    GIO[cmd/tws_manager_gio]
-    HELPER[cmd/tws_manager_rfcomm_helper]
+    TUI[cmd/nothing_helper]
+    GIO[cmd/nothing_helper]
+    HELPER[cmd/nothing_helper_rfcomm_helper]
   end
 
   subgraph app [Bootstrap]

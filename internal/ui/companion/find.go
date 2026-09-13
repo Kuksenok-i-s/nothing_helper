@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"tws_manager/internal/session"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/session"
+	"nothing_helper/internal/spp"
 )
 
 type statusReader interface{ Status() error }

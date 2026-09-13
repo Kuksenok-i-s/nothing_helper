@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/spp"
 )
 
 // Command describes a UI-selectable protocol action.

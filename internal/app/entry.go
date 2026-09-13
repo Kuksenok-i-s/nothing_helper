@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"tws_manager/internal/bt"
-	"tws_manager/internal/connect"
-	"tws_manager/internal/dualpolicy"
-	"tws_manager/internal/notify"
-	"tws_manager/internal/session"
+	"nothing_helper/internal/bt"
+	"nothing_helper/internal/connect"
+	"nothing_helper/internal/dualpolicy"
+	"nothing_helper/internal/notify"
+	"nothing_helper/internal/session"
 )
 
 // Services bundles connect/notify helpers wired from entrypoints.

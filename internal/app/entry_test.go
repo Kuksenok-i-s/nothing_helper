@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"tws_manager/internal/dualpolicy"
-	"tws_manager/internal/session"
+	"nothing_helper/internal/dualpolicy"
+	"nothing_helper/internal/session"
 )
 
 func testRuntime(notify bool) *Runtime {

@@ -1,11 +1,13 @@
-pkgname=tws_manager
+pkgname=nothing_helper
 pkgver=0.1.0
 pkgrel=1
+conflicts=('tws_manager')
+replaces=('tws_manager')
 pkgdesc="Nothing_helper desktop client with tray and autoconnect"
 arch=('x86_64' 'aarch64')
 url="https://github.com/Kuksenok-i-s/nothing_helper"
 license=('MIT')
-install='tws_manager.install'
+install='nothing_helper.install'
 depends=('bluez' 'bluez-utils' 'polkit' 'libnotify' 'libayatana-appindicator' 'libxkbcommon-x11')
 optdepends=('pipewire: active microphone detection for Walkie Talkie')
 makedepends=('go' 'pkgconf' 'gtk3' 'vulkan-headers')
@@ -20,20 +22,20 @@ build() {
   cd "${_rootdir}"
   export CGO_ENABLED=1
   export GOFLAGS="-buildmode=pie -trimpath -ldflags=-linkmode=external -mod=readonly"
-  go build -tags "gio systray" -o bin/tws_manager ./cmd/tws_manager
-  go build -o bin/tws_manager_rfcomm_helper ./cmd/tws_manager_rfcomm_helper
+  go build -tags "gio systray" -o bin/nothing_helper ./cmd/nothing_helper
+  go build -o bin/nothing_helper_rfcomm_helper ./cmd/nothing_helper_rfcomm_helper
 }
 
 package() {
   cd "${_rootdir}"
-  install -Dm755 bin/tws_manager "${pkgdir}/usr/bin/tws_manager"
-  install -Dm755 bin/tws_manager_rfcomm_helper "${pkgdir}/usr/libexec/tws_manager_rfcomm_helper"
-  install -Dm644 packaging/common/tws_manager.desktop "${pkgdir}/usr/share/applications/tws_manager.desktop"
-  install -Dm644 packaging/common/tws_manager-autostart.desktop "${pkgdir}/etc/xdg/autostart/tws_manager.desktop"
-  install -Dm644 packaging/common/tws_manager.svg "${pkgdir}/usr/share/icons/hicolor/scalable/apps/tws_manager.svg"
-  install -Dm644 packaging/common/org.tws_manager.rfcomm.policy "${pkgdir}/usr/share/polkit-1/actions/org.tws_manager.rfcomm.policy"
-  install -Dm644 packaging/common/90-tws_manager.rules "${pkgdir}/etc/polkit-1/rules.d/90-tws_manager.rules"
-  install -Dm644 packaging/common/tws_manager.sysusers "${pkgdir}/usr/lib/sysusers.d/tws_manager.conf"
-  install -Dm644 README.md "${pkgdir}/usr/share/doc/tws_manager/README.md"
-  install -Dm644 SECURITY.md "${pkgdir}/usr/share/doc/tws_manager/SECURITY.md"
+  install -Dm755 bin/nothing_helper "${pkgdir}/usr/bin/nothing_helper"
+  install -Dm755 bin/nothing_helper_rfcomm_helper "${pkgdir}/usr/libexec/nothing_helper_rfcomm_helper"
+  install -Dm644 packaging/common/nothing_helper.desktop "${pkgdir}/usr/share/applications/nothing_helper.desktop"
+  install -Dm644 packaging/common/nothing_helper-autostart.desktop "${pkgdir}/etc/xdg/autostart/nothing_helper.desktop"
+  install -Dm644 packaging/common/nothing_helper.svg "${pkgdir}/usr/share/icons/hicolor/scalable/apps/nothing_helper.svg"
+  install -Dm644 packaging/common/org.nothing_helper.rfcomm.policy "${pkgdir}/usr/share/polkit-1/actions/org.nothing_helper.rfcomm.policy"
+  install -Dm644 packaging/common/90-nothing_helper.rules "${pkgdir}/etc/polkit-1/rules.d/90-nothing_helper.rules"
+  install -Dm644 packaging/common/nothing_helper.sysusers "${pkgdir}/usr/lib/sysusers.d/nothing_helper.conf"
+  install -Dm644 README.md "${pkgdir}/usr/share/doc/nothing_helper/README.md"
+  install -Dm644 SECURITY.md "${pkgdir}/usr/share/doc/nothing_helper/SECURITY.md"
 }

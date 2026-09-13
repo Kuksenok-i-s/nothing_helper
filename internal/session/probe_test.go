@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"tws_manager/internal/bt"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/bt"
+	"nothing_helper/internal/spp"
 )
 
 func TestInitialProbeSendsHandshake(t *testing.T) {

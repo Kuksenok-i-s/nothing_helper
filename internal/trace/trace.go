@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/spp"
 )
 
 type DeviceInfo struct {

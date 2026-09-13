@@ -26,7 +26,7 @@ var (
 // New returns a Notifier for appName using gdbus or notify-send.
 func New(appName, icon string) *Notifier {
 	if appName == "" {
-		appName = "tws_manager"
+		appName = "nothing_helper"
 	}
 	if icon == "" {
 		icon = "audio-headphones"
@@ -85,7 +85,7 @@ func (n *Notifier) sendNotifySend(replaces uint32, urgency Urgency, title, body,
 
 func (n *Notifier) sendNotifySendDirect(urgency Urgency, title, body, icon string) uint32 {
 	args := []string{"-a", n.app, "-i", icon, "-u", urgencyName(urgency)}
-	args = append(args, "-h", "string:x-canonical-private-synchronous:tws_manager")
+	args = append(args, "-h", "string:x-canonical-private-synchronous:nothing_helper")
 	args = append(args, title, body)
 	ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
 	defer cancel()

@@ -2,7 +2,7 @@ package session
 
 import (
 	"testing"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/spp"
 )
 
 func TestMicWriteGuardsAndReadback(t *testing.T) {

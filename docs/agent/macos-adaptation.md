@@ -1,6 +1,6 @@
 # macOS adaptation — research findings
 
-Research-only document (no production code changes yet). Goal: decide whether and how to port the Linux-only tws_manager client to macOS across Bluetooth, tray, and GUI.
+Research-only document (no production code changes yet). Goal: decide whether and how to port the Linux-only nothing_helper client to macOS across Bluetooth, tray, and GUI.
 
 **Gate:** macOS must expose a reliable Classic Bluetooth SPP/RFCOMM byte stream compatible with existing `internal/session` and `internal/spp` layers.
 
@@ -32,9 +32,9 @@ Research-only document (no production code changes yet). Goal: decide whether an
 | RFCOMM bind | `rfcomm bind N MAC CHANNEL` | **No equivalent** — open RFCOMM channel directly on paired device |
 | Device node | `/dev/rfcommN` TTY | Optional `/dev/cu.*` exists after pairing but **unreliable for TX/RX** (see §2) |
 | Open transport | `unix.Open`, `TIOCM_CD` carrier poll, raw termios (`TCGETS`/`TCSETS`) | IOBluetooth delegate callbacks; blocks current macOS `go build` (undefined syscalls) |
-| Privileges | `sudo`, `pkexec`, `tws_manager_rfcomm_helper`, chown/chmod on TTY | Not needed; Bluetooth permission via TCC |
+| Privileges | `sudo`, `pkexec`, `nothing_helper_rfcomm_helper`, chown/chmod on TTY | Not needed; Bluetooth permission via TCC |
 | Revive stale link | `rfcomm release` + re-bind + permission fix | Explicit RFCOMM channel close + reopen; macOS `bluetoothd` reconnect bugs documented |
-| Config persistence | `~/.config/tws_manager/` maps `/dev/rfcommN` → MAC + channel | Store MAC → channel only; drop path-based keys on Darwin |
+| Config persistence | `~/.config/nothing_helper/` maps `/dev/rfcommN` → MAC + channel | Store MAC → channel only; drop path-based keys on Darwin |
 | SPP UUID | `AEAC4A03-DFF5-498F-843A-34487CF133EB` in `bluetoothctl info` | Query via SDP on `IOBluetoothDevice` |
 | Default channel | 15 | Same default; confirm via SDP spike |
 
@@ -65,7 +65,7 @@ Research-only document (no production code changes yet). Goal: decide whether an
 | Bundle | N/A on Linux | **Required** `.app` wrapper for reliable menu bar icon |
 | Event loop | `systray.Run` in goroutine + Gio `app.Main()` on main thread | Same pattern documented for macOS; verify on hardware |
 
-### GUI (`internal/ui/gio`, `cmd/tws_manager_gio`)
+### GUI (`internal/ui/gio`, `cmd/nothing_helper`)
 
 | Assumption | Detail | macOS impact |
 |------------|--------|--------------|
@@ -92,7 +92,7 @@ Research-only document (no production code changes yet). Goal: decide whether an
 |------------|--------|--------------|
 | Host adapter MAC | `bluetoothctl show` | IOBluetooth host controller address API or system_profiler fallback |
 
-### Privileges / helper (`internal/bt/privilege.go`, `cmd/tws_manager_rfcomm_helper`)
+### Privileges / helper (`internal/bt/privilege.go`, `cmd/nothing_helper_rfcomm_helper`)
 
 | Assumption | Detail | macOS impact |
 |------------|--------|--------------|
@@ -110,7 +110,7 @@ Research-only document (no production code changes yet). Goal: decide whether an
 ### Build verification (this research session, darwin arm64)
 
 ```
-go build -tags gio ./cmd/tws_manager_gio
+go build -tags gio ./cmd/nothing_helper
 # FAIL: internal/bt/bt.go — undefined unix.TCGETS / unix.TCSETS
 ```
 
@@ -223,7 +223,7 @@ Platform files:
 
 - `connect.Manager`: platform-specific `Discover`, `Bind`/`Open`, `RFCOMMExists` → `TransportReady`.
 - `internal/app/flags.go`: Darwin defaults — `--device` optional, `--privilege-helper=none`.
-- Remove Darwin imports of `tws_manager_rfcomm_helper`.
+- Remove Darwin imports of `nothing_helper_rfcomm_helper`.
 
 ### What stays shared (no fork)
 
@@ -274,8 +274,8 @@ flowchart TB
 **Gio-only smoke test (after PR 1 linux/darwin split):**
 
 ```bash
-go build -tags gio -o bin/tws_manager_gio ./cmd/tws_manager_gio
-./bin/tws_manager_gio --auto=false --privilege-helper=none
+go build -tags gio -o bin/nothing_helper ./cmd/nothing_helper
+./bin/nothing_helper --auto=false --privilege-helper=none
 # Expect: window opens; device list empty or error without Bluetooth backend
 ```
 
@@ -294,7 +294,7 @@ go build -tags gio -o bin/tws_manager_gio ./cmd/tws_manager_gio
 
 ```bash
 # Build with systray tag, place in .app bundle (script TBD)
-open tws_manager.app
+open nothing_helper.app
 # Menu bar icon visible; menu shows Disconnected / Battery / Quit
 # Quit exits process; Show window raises Gio window
 ```

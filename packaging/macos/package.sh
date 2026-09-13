@@ -13,7 +13,7 @@ echo "==> Universal binary (arm64 + x86_64)"
 "$ROOT/packaging/macos/build-universal.sh"
 
 echo "==> App bundle"
-PREBUILT_BIN="$ROOT/dist/build/macos/tws_manager-universal" \
+PREBUILT_BIN="$ROOT/dist/build/macos/nothing_helper-universal" \
 	"$ROOT/packaging/macos/bundle.sh"
 
 echo "==> DMG"

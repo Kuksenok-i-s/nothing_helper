@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"tws_manager/internal/bt"
-	"tws_manager/internal/security"
-	"tws_manager/internal/session"
+	"nothing_helper/internal/bt"
+	"nothing_helper/internal/security"
+	"nothing_helper/internal/session"
 )
 
 // Options holds RFCOMM connection parameters for UI-driven connect flows.

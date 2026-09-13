@@ -10,16 +10,16 @@ import (
 	"syscall"
 	"time"
 
-	"tws_manager/internal/app"
-	"tws_manager/internal/bt"
-	"tws_manager/internal/connect"
-	"tws_manager/internal/ui/companion"
-	"tws_manager/internal/ui/tray"
+	"nothing_helper/internal/app"
+	"nothing_helper/internal/bt"
+	"nothing_helper/internal/connect"
+	"nothing_helper/internal/ui/companion"
+	"nothing_helper/internal/ui/tray"
 )
 
 func main() { os.Exit(runMain(os.Args[1:])) }
 func runMain(args []string) int {
-	fs := flag.NewFlagSet("tws_manager", flag.ContinueOnError)
+	fs := flag.NewFlagSet("nothing_helper", flag.ContinueOnError)
 	flags := app.RegisterFlags(fs, app.ProfileGUI)
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -28,7 +28,7 @@ func runMain(args []string) int {
 		return 2
 	}
 	if !companion.Available() {
-		fmt.Fprintln(os.Stderr, "GUI is not included; build with make build or go run -tags gio ./cmd/tws_manager")
+		fmt.Fprintln(os.Stderr, "GUI is not included; build with make build or go run -tags gio ./cmd/nothing_helper")
 		return 1
 	}
 	cfg, err := app.ConfigFromFlags(flags)

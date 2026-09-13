@@ -1,0 +1,10 @@
+polkit.addRule(function(action, subject) {
+    if ((action.id == "org.nothing_helper.rfcomm.manage" ||
+         action.id == "org.nothing_helper.rfcomm.manage-release" ||
+         action.id == "org.nothing_helper.rfcomm.manage-fix-perms") &&
+        subject.active &&
+        subject.local &&
+        subject.isInGroup("nothing_helper")) {
+        return polkit.Result.YES;
+    }
+});

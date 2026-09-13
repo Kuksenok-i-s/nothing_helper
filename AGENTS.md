@@ -1,4 +1,4 @@
-# AGENTS: tws_manager
+# AGENTS: nothing_helper
 
 > **Full agent wiki (English):** [docs/AGENT_WIKI.md](docs/AGENT_WIKI.md) — agent guide, code examples, split docs under [docs/agent/](docs/agent/).
 
@@ -6,7 +6,7 @@
 
 ## 1) Что это за проект
 
-CLI/TUI-клиент для работы с устройствами Nothing/CMF через RFCOMM SPP:
+Desktop-клиент для работы с устройствами Nothing/CMF через RFCOMM SPP:
 - обнаружение Bluetooth-устройств;
 - управление RFCOMM (`/dev/rfcommN`) с авто-восстановлением;
 - отправка/прием SPP-пакетов;
@@ -14,20 +14,15 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
 - логирование сессии в NDJSON + экспорт пакетов в JSON.
 
 Точки входа:
-- `cmd/tws_manager/main.go` - TUI (Bubble Tea);
-- `cmd/tws_manager_gio/main.go` - Gio GUI (`-tags gio`, нужен `vulkan-headers` на Linux).
+- `cmd/nothing_helper/main.go` — единый GUI (Gio) с треем; `make run`.
+- `cmd/nothing_helper_rfcomm_helper/main.go` — Linux polkit helper.
 
 ## 2) Карта Go-пакетов
 
-- `cmd/tws_manager/main.go`
+- `cmd/nothing_helper/main.go`
   - парсит флаги через `internal/app`;
-  - поднимает `session.Session`, `tray`, `tui`;
-  - stdin preflight RFCOMM (bind/discover).
-
-- `cmd/tws_manager_gio/main.go`
-  - тот же bootstrap (`internal/app`);
-  - `internal/connect` для discover/bind/connect из GUI;
-  - `internal/ui/gio` (build tag `gio`).
+  - поднимает `session.Session`, `tray`, `internal/ui/companion`;
+  - использует `internal/connect` для discover/bind/connect из GUI.
 
 - `internal/app`
   - общая валидация флагов и bootstrap (`Runtime`).
@@ -42,7 +37,7 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
  - при `--notify` без `--query-every` включается опрос батареи каждые 60 с.
 
 - `internal/ui/presenter`
-  - общий лог/статус и каталог команд для TUI и Gio.
+  - общий каталог команд для GUI.
 
 - `internal/session`
   - центральный orchestration слой;
@@ -70,13 +65,10 @@ CLI/TUI-клиент для работы с устройствами Nothing/CMF
 - `internal/security`
   - input validation: MAC, `/dev/rfcommN`, channel, writable path.
 
-- `internal/ui/tui`
-  - Bubble Tea UI: devices/control/log;
-  - использует `connect.Manager` и `presenter`;
-  - экспорт текущей истории пакетов.
-
-- `internal/ui/gio`
-  - Gio GUI (build tag `gio`): `app`, `config`, `state`, `theme`, `widgets`, `view`
+- `internal/ui/companion`
+  - компактный Gio GUI и контроллер действий;
+  - батарея, ANC/EQ, устройства, диагностика, поиск, Walkie Talkie;
+  - старые TUI и отдельный Gio UI удалены.
 
 - `internal/ui/tray`
   - systray сборка (build tag `systray`) + fallback no-op;
@@ -155,12 +147,12 @@ CI (`.github/workflows/ci.yml`): Linux vet/build/test-race + Debian `.deb` smoke
 Релизы: tag `v*` или `workflow_dispatch` в `release-client-linux.yml` / `release-client-macos.yml`. Версия: `scripts/pkg-version.sh`.
 
 Ручной запуск:
-- `go run ./cmd/tws_manager --device /dev/rfcomm0`
-- Gio: `make run-gio` или `go run -tags gio ./cmd/tws_manager_gio` (Linux: `vulkan-headers`)
+- `go run -tags "gio systray" ./cmd/nothing_helper --device /dev/rfcomm0`
+- Gio: `make run-gio` или `go run -tags gio ./cmd/nothing_helper` (Linux: `vulkan-headers`)
 - с явным MAC:
-  - `go run ./cmd/tws_manager --device /dev/rfcomm0 --addr XX:XX:XX:XX:XX:XX --channel 15`
+  - `go run -tags "gio systray" ./cmd/nothing_helper --device /dev/rfcomm0 --addr XX:XX:XX:XX:XX:XX --channel 15`
 - c tracing:
-  - `go run ./cmd/tws_manager --log captures/session.ndjson --log-raw`
+  - `go run -tags "gio systray" ./cmd/nothing_helper --log captures/session.ndjson --log-raw`
 
 ## 7) Быстрый чеклист для агентов перед PR
 
@@ -181,5 +173,5 @@ CI (`.github/workflows/ci.yml`): Linux vet/build/test-race + Debian `.deb` smoke
 - Session orchestration: `internal/session/session.go`
 - RFCOMM lifecycle: `internal/bt/bt.go`
 - Trace/export/redaction: `internal/trace/trace.go`
-- UI actions: `internal/ui/tui/tui.go`
+- UI actions: `internal/ui/companion/controller.go`
 

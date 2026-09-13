@@ -2,7 +2,7 @@
 
 | Topic | File |
 |-------|------|
-| Companion entrypoint | `cmd/tws_manager/main.go` |
+| Companion entrypoint | `cmd/nothing_helper/main.go` |
 | Compact GUI | `internal/ui/companion/view.go`, `pages.go` |
 | Flags / bootstrap | `internal/app/flags.go`, `bootstrap.go`, `entry.go` |
 | Session connect/TX/RX | `internal/session/session.go` |

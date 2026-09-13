@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"tws_manager/internal/bt"
-	"tws_manager/internal/session"
+	"nothing_helper/internal/bt"
+	"nothing_helper/internal/session"
 )
 
 func TestSwitchToIdempotent(t *testing.T) {

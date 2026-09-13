@@ -10,5 +10,5 @@ import (
 func Available() bool { return false }
 
 func Run(context.Context, Options) error {
-	return fmt.Errorf("GUI is not included in this build; use make build or go run -tags gio ./cmd/tws_manager")
+	return fmt.Errorf("GUI is not included in this build; use make build or go run -tags gio ./cmd/nothing_helper")
 }

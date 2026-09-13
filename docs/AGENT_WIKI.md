@@ -1,4 +1,4 @@
-# tws_manager — Agent Wiki
+# nothing_helper — Agent Wiki
 
 Instructions and reference for **AI agents** editing this repo.
 
@@ -12,7 +12,7 @@ Short Russian checklist: [AGENTS.md](../AGENTS.md).
 2. **Read invariants first.** [invariants.md](agent/invariants.md) and [safety.md](agent/safety.md) — never weaken guards without explicit user request.
 3. **Stay in scope.** Default edit surface: `cmd/` + `internal/`. Do not touch packaging/docs unless asked.
 4. **Match existing patterns.** Copy structure from nearby tests and handlers; run `go test ./...` before finishing.
-5. **One desktop UI.** `cmd/tws_manager` starts the compact `internal/ui/companion` GUI. The old TUI and Gio UI packages were removed; keep device operations in the controller/session layers.
+5. **One desktop UI.** `cmd/nothing_helper` starts the compact `internal/ui/companion` GUI. The old TUI and Gio UI packages were removed; keep device operations in the controller/session layers.
 6. **No hardware assumptions.** You cannot run RFCOMM here; rely on unit tests and fixtures in `internal/spp/spp_test.go`.
 
 When unsure about device-specific protocol behaviour (undocumented opcodes, new models), **ask the user** rather than guessing.

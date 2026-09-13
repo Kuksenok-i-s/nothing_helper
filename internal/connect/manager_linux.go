@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"tws_manager/internal/bt"
+	"nothing_helper/internal/bt"
 )
 
 // RFCOMMExists reports whether the configured RFCOMM device node exists.

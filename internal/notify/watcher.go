@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"tws_manager/internal/session"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/session"
+	"nothing_helper/internal/spp"
 )
 
 // lowLevel describes one low-battery threshold and the alert it raises.
@@ -46,7 +46,7 @@ type Options struct {
 // or the event stream closes.
 func Run(ctx context.Context, s *session.Session, opts Options) {
 	if opts.AppName == "" {
-		opts.AppName = "tws_manager"
+		opts.AppName = "nothing_helper"
 	}
 	earbudLevels := opts.EarbudLevels
 	if earbudLevels == nil {

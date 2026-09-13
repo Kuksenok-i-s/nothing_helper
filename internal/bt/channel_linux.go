@@ -5,7 +5,7 @@ package bt
 import (
 	"errors"
 
-	"tws_manager/internal/security"
+	"nothing_helper/internal/security"
 )
 
 // channelCandidates orders RFCOMM channels to try: preferred, then 15, then

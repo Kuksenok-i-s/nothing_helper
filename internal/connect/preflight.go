@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"tws_manager/internal/bt"
+	"nothing_helper/internal/bt"
 )
 
 // ResolvePreflightAddress returns an explicit address or a saved MAC for devicePath.
