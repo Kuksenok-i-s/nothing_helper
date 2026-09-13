@@ -13,3 +13,7 @@ override_dh_auto_build:
 override_dh_auto_test:
 	go test ./...
 	go vet ./...
+
+# Go emits DWARF features unsupported by Debian's dwz optimizer.
+# Keep normal dh_strip handling; only skip the optional DWARF deduplication.
+override_dh_dwz:
