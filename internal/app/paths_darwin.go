@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 )
 
-// darwinDataDir returns ~/Library/Application Support/tws_manager (or fallback).
+// darwinDataDir returns ~/Library/Application Support/nothing_helper (or fallback).
 func darwinDataDir() string {
 	base, err := os.UserConfigDir()
 	if err != nil {
-		return "tws_manager"
+		return "nothing_helper"
 	}
-	return filepath.Join(base, "tws_manager")
+	return filepath.Join(base, "nothing_helper")
 }
 
 func captureDirDefault(profile Profile) string {

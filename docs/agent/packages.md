@@ -63,7 +63,7 @@ Response match: FSN echo, else `0x40xx` → request `0xC0xx`.
 | `ConfigurePrivileges` | sudo / polkit / auto / none |
 | `ResolveDeviceChannel` | Per-MAC cache or default 15 |
 
-Privilege helper: `cmd/tws_manager_rfcomm_helper` — `bind`, `release`, `fix-perms` only.
+Privilege helper: `cmd/nothing_helper_rfcomm_helper` — `bind`, `release`, `fix-perms` only.
 
 ---
 

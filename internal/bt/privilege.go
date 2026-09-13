@@ -20,8 +20,8 @@ const (
 )
 
 const (
-	defaultPolkitHelperPath = "/usr/libexec/tws_manager_rfcomm_helper"
-	altPolkitHelperPath     = "/usr/lib/tws_manager/tws_manager_rfcomm_helper"
+	defaultPolkitHelperPath = "/usr/libexec/nothing_helper_rfcomm_helper"
+	altPolkitHelperPath     = "/usr/lib/nothing_helper/nothing_helper_rfcomm_helper"
 )
 
 type privilegeConfig struct {

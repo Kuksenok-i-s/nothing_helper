@@ -3,7 +3,7 @@
 package bt
 
 import (
-	"tws_manager/internal/security"
+	"nothing_helper/internal/security"
 )
 
 func sanitizeConfig(cfg Config) Config {

@@ -39,7 +39,7 @@ func TestCaptureDirDefaultGUIUsesAppSupport(t *testing.T) {
 	if got == "captures" {
 		t.Fatalf("GUI capture default should not be relative captures, got %q", got)
 	}
-	if !strings.Contains(got, "tws_manager") {
-		t.Fatalf("GUI capture default = %q, want tws_manager in path", got)
+	if !strings.Contains(got, "nothing_helper") {
+		t.Fatalf("GUI capture default = %q, want nothing_helper in path", got)
 	}
 }

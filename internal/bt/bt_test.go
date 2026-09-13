@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"tws_manager/internal/security"
+	"nothing_helper/internal/security"
 )
 
 func TestIsRecoverableRFCOMMOpenError(t *testing.T) {

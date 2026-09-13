@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"regexp"
 
-	"tws_manager/internal/bt"
-	"tws_manager/internal/security"
+	"nothing_helper/internal/bt"
+	"nothing_helper/internal/security"
 )
 
 var systemProfilerMAC = regexp.MustCompile(`(?i)Bluetooth Address:\s*([0-9A-F:]{17})`)

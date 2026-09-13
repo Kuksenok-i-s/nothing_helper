@@ -7,8 +7,8 @@ import (
 
 	"github.com/getlantern/systray"
 
-	"tws_manager/internal/session"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/session"
+	"nothing_helper/internal/spp"
 )
 
 func Run(ctx context.Context, s *session.Session, opts Options) {

@@ -78,7 +78,9 @@ jobs:
         id: pkg
         run: |
           debian_version="${{ steps.ver.outputs.debian_version }}"
-          artifact="dist/tws-manager_${debian_version}-1_amd64.deb"
+          source="dist/nothing-helper_${debian_version}-1_amd64.deb"
+          artifact="dist/Nothing_helper_${debian_version}-1_amd64.deb"
+          mv "${source}" "${artifact}"
           if [[ ! -f "${artifact}" ]]; then
             echo "error: expected .deb not found: ${artifact}" >&2
             ls -la dist/ >&2 || true
@@ -90,7 +92,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tws-manager-linux-deb-amd64-${{ steps.ver.outputs.version }}
+          name: nothing-helper-linux-deb-amd64-${{ steps.ver.outputs.version }}
           path: |
             ${{ steps.pkg.outputs.artifact }}
             ${{ steps.pkg.outputs.artifact }}.sha256
@@ -136,7 +138,9 @@ jobs:
         id: pkg
         run: |
           debian_version="${{ steps.ver.outputs.debian_version }}"
-          artifact="dist/tws-manager_${debian_version}-1_arm64.deb"
+          source="dist/nothing-helper_${debian_version}-1_arm64.deb"
+          artifact="dist/Nothing_helper_${debian_version}-1_arm64.deb"
+          mv "${source}" "${artifact}"
           if [[ ! -f "${artifact}" ]]; then
             echo "error: expected .deb not found: ${artifact}" >&2
             ls -la dist/ >&2 || true
@@ -148,7 +152,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tws-manager-linux-deb-arm64-${{ steps.ver.outputs.version }}
+          name: nothing-helper-linux-deb-arm64-${{ steps.ver.outputs.version }}
           path: |
             ${{ steps.pkg.outputs.artifact }}
             ${{ steps.pkg.outputs.artifact }}.sha256
@@ -197,7 +201,9 @@ jobs:
         run: |
           version="${{ steps.ver.outputs.version }}"
           pacman_ver="${version//\~/.}"
-          artifact="dist/tws_manager-${pacman_ver}-1-x86_64.pkg.tar.zst"
+          source="dist/nothing_helper-${pacman_ver}-1-x86_64.pkg.tar.zst"
+          artifact="dist/Nothing_helper-${pacman_ver}-1-x86_64.pkg.tar.zst"
+          mv "${source}" "${artifact}"
           if [[ ! -f "${artifact}" ]]; then
             echo "error: expected Arch package not found: ${artifact}" >&2
             ls -la dist/ packaging/arch/ >&2 || true
@@ -209,7 +215,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tws-manager-linux-arch-amd64-${{ steps.ver.outputs.version }}
+          name: nothing-helper-linux-arch-amd64-${{ steps.ver.outputs.version }}
           path: |
             ${{ steps.pkg.outputs.artifact }}
             ${{ steps.pkg.outputs.artifact }}.sha256
@@ -264,7 +270,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tws-manager-linux-bundle-amd64-${{ steps.ver.outputs.version }}
+          name: nothing-helper-linux-bundle-amd64-${{ steps.ver.outputs.version }}
           path: |
             ${{ steps.pkg.outputs.artifact }}
             ${{ steps.pkg.outputs.artifact }}.sha256
@@ -283,25 +289,25 @@ jobs:
       - name: Download Debian amd64
         uses: actions/download-artifact@v4
         with:
-          name: tws-manager-linux-deb-amd64-${{ needs.release-linux-deb-amd64.outputs.version }}
+          name: nothing-helper-linux-deb-amd64-${{ needs.release-linux-deb-amd64.outputs.version }}
           path: dist/deb-amd64
 
       - name: Download Debian arm64
         uses: actions/download-artifact@v4
         with:
-          name: tws-manager-linux-deb-arm64-${{ needs.release-linux-deb-arm64.outputs.version }}
+          name: nothing-helper-linux-deb-arm64-${{ needs.release-linux-deb-arm64.outputs.version }}
           path: dist/deb-arm64
 
       - name: Download Arch amd64
         uses: actions/download-artifact@v4
         with:
-          name: tws-manager-linux-arch-amd64-${{ needs.release-linux-arch-amd64.outputs.version }}
+          name: nothing-helper-linux-arch-amd64-${{ needs.release-linux-arch-amd64.outputs.version }}
           path: dist/arch-amd64
 
       - name: Download portable tarball
         uses: actions/download-artifact@v4
         with:
-          name: tws-manager-linux-bundle-amd64-${{ needs.release-linux-bundle-amd64.outputs.version }}
+          name: nothing-helper-linux-bundle-amd64-${{ needs.release-linux-bundle-amd64.outputs.version }}
           path: dist/bundle
 
       - name: Publish GitHub Release

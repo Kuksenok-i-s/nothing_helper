@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"tws_manager/internal/audio"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/audio"
+	"nothing_helper/internal/spp"
 )
 
 type captureChecker interface {

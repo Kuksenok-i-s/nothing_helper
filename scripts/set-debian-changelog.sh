@@ -6,13 +6,13 @@
 #   DEBIAN_REVISION            Debian revision, default 1
 #   DEBIAN_DIST                distribution, default unstable
 #   DEBIAN_URGENCY             urgency, default medium
-#   DEBIAN_PKG                 source/binary package name, default tws-manager
+#   DEBIAN_PKG                 source/binary package name, default nothing-helper
 #   DEBIAN_CHANGELOG_MSG       override bullet text
 #   SOURCE_DATE_EPOCH          reproducible timestamp (seconds since epoch)
 set -euo pipefail
 
 root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
-pkg="${DEBIAN_PKG:-tws-manager}"
+pkg="${DEBIAN_PKG:-nothing-helper}"
 revision="${DEBIAN_REVISION:-1}"
 distribution="${DEBIAN_DIST:-unstable}"
 urgency="${DEBIAN_URGENCY:-medium}"
@@ -20,7 +20,7 @@ upstream="$("${root}/scripts/debian-version.sh")"
 display="${PKG_VERSION:-${APP_VERSION:-${upstream}}}"
 message="${DEBIAN_CHANGELOG_MSG:-Release ${display}.}"
 changelog="${root}/packaging/debian/changelog"
-maintainer_name="${DEBIAN_FULLNAME:-tws_manager maintainers}"
+maintainer_name="${DEBIAN_FULLNAME:-nothing_helper maintainers}"
 maintainer_email="${DEBIAN_EMAIL:-kuksyenok.i.s@gmail.com}"
 maintainer="${maintainer_name} <${maintainer_email}>"
 version="${upstream}-${revision}"

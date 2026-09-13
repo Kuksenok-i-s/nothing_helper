@@ -3,7 +3,7 @@ package connect
 import (
 	"testing"
 
-	"tws_manager/internal/bt"
+	"nothing_helper/internal/bt"
 )
 
 func TestParseDeviceSelection(t *testing.T) {

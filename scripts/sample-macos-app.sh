@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Sample an already-running tws_manager process with macOS 'sample' (no rebuild needed).
+# Sample an already-running nothing_helper process with macOS 'sample' (no rebuild needed).
 #
 # Usage:
 #   ./scripts/sample-macos-app.sh
-#   ./scripts/sample-macos-app.sh tws_manager 30
+#   ./scripts/sample-macos-app.sh nothing_helper 30
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-NAME="${1:-tws_manager}"
+NAME="${1:-nothing_helper}"
 SECONDS="${2:-20}"
 OUT_DIR="${PROFILE_OUT_DIR:-captures/profiles}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -24,7 +24,7 @@ if [[ -z "$pid" ]]; then
 fi
 if [[ -z "$pid" ]]; then
   echo "error: no running process named $NAME" >&2
-  echo "Start tws_manager first, then rerun this script." >&2
+  echo "Start nothing_helper first, then rerun this script." >&2
   exit 1
 fi
 
@@ -33,4 +33,4 @@ sample "$pid" "$SECONDS" -file "$OUT_TXT"
 
 echo "Sample saved: $OUT_TXT"
 echo "Search for hot symbols:"
-echo "  rg 'Call graph|tws_manager|gioui|IOBluetooth|CFRunLoop' $OUT_TXT"
+echo "  rg 'Call graph|nothing_helper|gioui|IOBluetooth|CFRunLoop' $OUT_TXT"

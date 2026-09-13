@@ -2,9 +2,9 @@
 Type=Application
 Version=1.0
 Name=Nothing_helper (Autostart)
-Comment=Autostart tws_manager on desktop login
-Exec=/usr/bin/tws_manager --auto --notify --privilege-helper=polkit
-Icon=tws_manager
+Comment=Autostart nothing_helper on desktop login
+Exec=/usr/bin/nothing_helper --auto --notify --privilege-helper=polkit
+Icon=nothing_helper
 Terminal=false
 Categories=AudioVideo;Utility;
 X-GNOME-Autostart-enabled=true

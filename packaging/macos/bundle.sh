@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bundle.sh — assemble tws_manager.app (native or prebuilt universal binary).
+# bundle.sh — assemble nothing_helper.app (native or prebuilt universal binary).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -18,7 +18,7 @@ if [[ -n "$PREBUILT_BIN" ]]; then
 	install -m 755 "$PREBUILT_BIN" "$BIN"
 else
 	echo "Building Gio binary for $(uname -m)..."
-	(cd "$ROOT" && CGO_ENABLED=1 go build -tags "gio systray" -o "$BIN" ./cmd/tws_manager)
+	(cd "$ROOT" && CGO_ENABLED=1 go build -tags "gio systray" -o "$BIN" ./cmd/nothing_helper)
 fi
 
 PLIST_SRC="$ROOT/packaging/macos/Info.plist.template"

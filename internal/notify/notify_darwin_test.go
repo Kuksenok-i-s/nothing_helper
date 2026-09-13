@@ -7,7 +7,7 @@ import "testing"
 // TestNewUsesOsascriptBackend checks that without an app bundle, New falls
 // back to osascript and still reports itself as available.
 func TestNewUsesOsascriptBackend(t *testing.T) {
-	n := New("tws_manager", "")
+	n := New("nothing_helper", "")
 	if n.backend != "osascript" {
 		t.Fatalf("backend=%q want osascript", n.backend)
 	}

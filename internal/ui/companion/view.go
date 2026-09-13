@@ -13,8 +13,8 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"tws_manager/internal/spp"
-	"tws_manager/internal/ui/presenter"
+	"nothing_helper/internal/spp"
+	"nothing_helper/internal/ui/presenter"
 )
 
 type view struct {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"tws_manager/internal/session"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/session"
+	"nothing_helper/internal/spp"
 )
 
 func TestGdbusIDRegex(t *testing.T) {

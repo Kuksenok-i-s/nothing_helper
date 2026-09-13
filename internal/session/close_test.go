@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"tws_manager/internal/bt"
+	"nothing_helper/internal/bt"
 )
 
 type blockingCloser struct {

@@ -85,7 +85,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tws-manager-macos-${{ steps.ver.outputs.version }}
+          name: nothing-helper-macos-${{ steps.ver.outputs.version }}
           path: |
             ${{ steps.pkg.outputs.artifact }}
             ${{ steps.pkg.outputs.artifact }}.sha256
@@ -100,7 +100,7 @@ jobs:
       - name: Download macOS DMG
         uses: actions/download-artifact@v4
         with:
-          name: tws-manager-macos-${{ needs.release-macos-client.outputs.version }}
+          name: nothing-helper-macos-${{ needs.release-macos-client.outputs.version }}
           path: dist/macos
 
       - name: Publish GitHub Release

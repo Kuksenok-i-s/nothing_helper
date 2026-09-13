@@ -1,6 +1,6 @@
 # Agent guide
 
-Operating rules for AI agents in **tws_manager**.
+Operating rules for AI agents in **nothing_helper**.
 
 ## Do
 

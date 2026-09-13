@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"tws_manager/internal/security"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/security"
+	"nothing_helper/internal/spp"
 )
 
 // Mode controls PC-primary dual connection prompting.

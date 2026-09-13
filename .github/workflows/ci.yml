@@ -50,7 +50,7 @@ jobs:
         run: go test ./...
 
       - name: Build companion with menu bar
-        run: go build -tags "gio systray" ./cmd/tws_manager
+        run: go build -tags "gio systray" ./cmd/nothing_helper
 
   linux-package-deb:
     name: Linux — Debian package (amd64)

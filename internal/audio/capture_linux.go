@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"tws_manager/internal/security"
+	"nothing_helper/internal/security"
 )
 
 // HasActiveCaptureForMAC checks the physical HFP node, not the persistent

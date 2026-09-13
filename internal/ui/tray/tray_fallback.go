@@ -5,7 +5,7 @@ package tray
 import (
 	"context"
 
-	"tws_manager/internal/session"
+	"nothing_helper/internal/session"
 )
 
 func Run(ctx context.Context, s *session.Session, opts Options) {

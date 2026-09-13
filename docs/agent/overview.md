@@ -2,7 +2,7 @@
 
 **For agents:** local Bluetooth client (Linux primary; macOS Gio experimental). No network API. Default safe mode. Read [agent-guide.md](agent-guide.md) and [invariants.md](invariants.md) before editing.
 
-**tws_manager** talks to Nothing/CMF earbuds over RFCOMM SPP. On Linux: `/dev/rfcommN` and BlueZ. On macOS: IOBluetooth (experimental).
+**nothing_helper** talks to Nothing/CMF earbuds over RFCOMM SPP. On Linux: `/dev/rfcommN` and BlueZ. On macOS: IOBluetooth (experimental).
 
 | Capability | Details |
 |------------|---------|
@@ -18,8 +18,8 @@
 
 | Binary | Path | Build tags | Role |
 |--------|------|------------|------|
-| `tws_manager` | `cmd/tws_manager/main.go` | `gio`, optional `systray` | Compact companion GUI |
-| `tws_manager_rfcomm_helper` | `cmd/tws_manager_rfcomm_helper/main.go` | — | polkit helper |
+| `nothing_helper` | `cmd/nothing_helper/main.go` | `gio`, optional `systray` | Compact companion GUI |
+| `nothing_helper_rfcomm_helper` | `cmd/nothing_helper_rfcomm_helper/main.go` | — | polkit helper |
 
 Minimal entrypoint pattern:
 

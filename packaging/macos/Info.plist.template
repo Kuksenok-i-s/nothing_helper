@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>{{APP_NAME}}</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.nothing-helper.tws-manager</string>
+	<string>com.nothing-helper.nothing-helper</string>
 	<key>CFBundleName</key>
 	<string>{{APP_NAME}}</string>
 	<key>CFBundleIconFile</key>

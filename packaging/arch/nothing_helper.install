@@ -1,0 +1,16 @@
+post_install() {
+  _nothing_helper_post_message
+}
+
+post_upgrade() {
+  _nothing_helper_post_message
+}
+
+_nothing_helper_post_message() {
+  echo "==> nothing_helper: autostart bind/release uses polkit helper without password"
+  echo "==> only for members of group 'nothing_helper'."
+  echo "==> Required once after install (Arch does not add users automatically):"
+  echo "==>   sudo usermod -aG nothing_helper \$USER"
+  echo "==> Then log out and log back in (full session restart)."
+  echo "==> Verify: groups | grep nothing_helper"
+}

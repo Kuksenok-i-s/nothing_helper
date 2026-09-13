@@ -3,7 +3,7 @@
 package app
 
 import (
-	"tws_manager/internal/security"
+	"nothing_helper/internal/security"
 )
 
 // ValidateFlags normalizes and validates flag values on Darwin.

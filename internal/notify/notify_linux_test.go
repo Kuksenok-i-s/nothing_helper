@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"tws_manager/internal/session"
+	"nothing_helper/internal/session"
 )
 
 func TestSendGdbusSuccess(t *testing.T) {

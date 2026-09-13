@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/spp"
 )
 
 type EarbudState struct {

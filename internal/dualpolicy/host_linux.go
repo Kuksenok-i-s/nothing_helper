@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"tws_manager/internal/security"
+	"nothing_helper/internal/security"
 )
 
 var execCombinedOutput = func(ctx context.Context, name string, args ...string) ([]byte, error) {

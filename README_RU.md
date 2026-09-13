@@ -1,11 +1,11 @@
 # Клиент для наушников Nothing (community)
 
-Сделан **для наших** — владельцев **Nothing** / **CMF**, кому нужно локальное управление без официального приложения: батарея, ANC, EQ, dual-подключение и остальное по SPP-протоколу устройства.
+Сделан **для владельцев** **Nothing** / **CMF**, кому нужно локальное управление без официального приложения: батарея, ANC, EQ, dual-подключение и остальное по SPP-протоколу устройства.
 
 ### Скорее всего работает со всеми поддерживаемыми моделями, но абсолютной гарантии нет — буду рад баг-репортам
 
 <h1 align="center">Nothing_helper</h1>
-<p align="center"><strong>Компактное приложение для наушников **Nothing / CMF** на Linux и macOS. Заряд, ANC, эквалайзер, поиск наушников и управление кнопкой TALK — с компьютера.</strong></p>
+<p align="center"><strong>Компактное приложение для наушников Nothing / CMF на Linux и macOS. Заряд, ANC, эквалайзер, поиск наушников и управление кнопкой TALK — с компьютера.</strong></p>
 <p align="center"><a href="https://github.com/Kuksenok-i-s/nothing_helper/releases/latest">Скачать последнюю версию</a> · <a href="LICENSE">MIT</a></p>
 
 <p align="center">
@@ -15,9 +15,7 @@
 
 Тёмная и светлая темы. Скриншоты интерфейса с демонстрационными данными.
 
-Системные имена Linux-пакетов и команда `tws_manager` сохранены для совместимости при обновлении.
-
-Независимый проект сообщества, не связанный с Nothing Technology Limited. macOS — экспериментальная поддержка; возможности зависят от модели.
+Независимый проект сообщества, не связанный с Nothing Technology Limited, возможности зависят от модели.
 
 ## Возможности
 
@@ -31,41 +29,66 @@
 - **Desktop-уведомления** - connect/disconnect, батарея, low-battery (`--notify`)
 - **Безопасность по умолчанию** - GET-команды и ограниченный набор валидированных UI SET; raw scan и не-UI SET требуют `--unsafe`
 
-## Требования
+## Требования и подготовка
 
-| Компонент | Назначение |
-|-----------|------------|
-| Go **1.26+** | сборка |
-| **BlueZ** (`bluetoothctl`, `rfcomm`) | Bluetooth |
-| Privileged helper (`polkit`) или `sudo` | bind/release RFCOMM, chown/chmod |
-| `vulkan-headers` (Linux) | только для Gio GUI |
-| `libayatana-appindicator` | system tray (Arch/Manjaro: `pacman -S libayatana-appindicator`) |
+Все команды выполняются из корня репозитория. Нужны **Go 1.26+**, C-компилятор и включённый CGO (`go env CGO_ENABLED` должен вывести `1`). Перед подключением выполните сопряжение наушников в настройках Bluetooth системы. Windows не поддерживается.
 
-Наушники должны быть **сопряжены** в системе. Канал RFCOMM по умолчанию - **15** (типично для Nothing Ear).
+### Linux
+
+Debian / Ubuntu:
+
+```bash
+make install-deps-debian
+```
+
+Arch / Manjaro:
+
+```bash
+make install-deps-arch
+```
+
+Эти цели устанавливают BlueZ, polkit, заголовки графических библиотек, AppIndicator для трея и инструменты PipeWire. `make install-deps` — алиас только для Debian/Ubuntu. На Debian/Ubuntu установите Go 1.26+ отдельно. В GNOME для иконки трея может понадобиться расширение AppIndicator. Для определения активного микрофона Walkie Talkie используется `pw-dump` из PipeWire.
+
+### macOS
+
+Установите Go 1.26+ и Xcode Command Line Tools (`xcode-select --install`). Bluetooth и строка меню используют системные фреймворки; BlueZ, polkit и AppIndicator нужны только на Linux. Сборка `.app` и универсального DMG описана в [macOS README](packaging/macos/README.md).
 
 ## Быстрый старт
 
 ```bash
-make build          # bin/tws_manager — GUI + tray
-make run            # compact companion
-make run-gio-lite   # GUI without system tray
+make help
+make build          # GUI + трей -> bin/nothing_helper
+./bin/nothing_helper
+# Или компиляция и запуск одной командой:
 make run ARGS="--addr AA:BB:CC:DD:EE:FF --channel 15"
-make test
 ```
 
-Сначала выполните сопряжение в настройках Bluetooth системы. На вкладке «Устройства» можно найти и выбрать наушники; подключение и настройка RFCOMM выполняются в фоне.
+Выберите наушники на вкладке «Устройства»; подключение и настройка RFCOMM выполняются в фоне. Исполняемый файл называется `nothing_helper`; окно и приложение macOS называются **Nothing_helper**.
 
-## Сборка
+## Варианты сборки
 
-| Цель | Команда | Результат |
-|------|---------|-----------|
-| Gio + tray | `make build-gio` | `bin/tws_manager` |
-| Gio без tray | `make build-gio-lite` | `bin/tws_manager` |
-| Тесты | `make test` | `go test ./...` |
+```bash
+make run-native     # Linux: X11/XWayland и системная рамка окна
+make build-native   # такая же сборка -> bin/nothing_helper
+make run-lite       # GUI без трея
+make build-lite     # такая же сборка -> bin/nothing_helper
+make build-package  # GUI + Linux RFCOMM helper -> bin/
+```
+
+`run` / `build` используют теги `gio systray`; `run-native` / `build-native` добавляют `nowayland` и требуют X11 либо XWayland на Linux. Обычная сборка поддерживает Wayland и X11. На macOS системная рамка используется при обычном `make run`. Lite-сборке всё ещё нужны графические зависимости Gio, но не нужен AppIndicator на Linux. Варианты перезаписывают один и тот же исполняемый файл.
+
+Эквивалентные команды Go:
+
+```bash
+go run -tags "gio systray" ./cmd/nothing_helper
+go build -tags "gio systray nowayland" -o bin/nothing_helper ./cmd/nothing_helper
+```
+
+Для совместимости сохранены `make run-gio`, `make build-gio`, цели `*-systray`, `*-gio-lite` и `make build-gio-package`. `GUI_TAGS` переопределяет теги обычной GUI-сборки и `check-gui`; например, `make build GUI_TAGS="gio systray nowayland"`.
 
 ## Флаги CLI
 
-Флаги `cmd/tws_manager`:
+Флаги `cmd/nothing_helper`:
 
 | Флаг | По умолчанию | Описание |
 |------|--------------|----------|
@@ -82,12 +105,12 @@ make test
 | `--auto` | `true` | автопоиск и подключение |
 | `--notify` | `true` | desktop-уведомления (нужны `gdbus` или `libnotify` / `notify-send`) |
 | `--privilege-helper` | `auto` | backend для privileged операций: `sudo`, `polkit`, `auto`, `none` |
-| `--privilege-helper-path` | - | путь к `tws_manager_rfcomm_helper` для `polkit` |
+| `--privilege-helper-path` | - | путь к `nothing_helper_rfcomm_helper` для `polkit` |
 
 Пример с трассировкой:
 
 ```bash
-go run -tags gio ./cmd/tws_manager --device /dev/rfcomm0 --log captures/session.ndjson --log-raw
+make run ARGS="--device /dev/rfcomm0 --log captures/session.ndjson --log-raw"
 ```
 
 ## Поддерживаемые устройства
@@ -125,17 +148,23 @@ Feature-команды в UI: `anc`, `eq`, `spatial`, `lag`, `dual` - с учё�
 
 Меню: статус, батарея, refresh, reconnect, disconnect, quit. На GNOME может понадобиться расширение AppIndicator.
 
+## Переход с v1.2.0
+
+В опубликованном v1.2.0 переименованы только файлы для скачивания; внутри них остаются старые имена программы и пакетов. Последующие сборки устанавливают `nothing_helper` и `nothing_helper_rfcomm_helper`. Рецепты Debian, Arch и RPM объявляют замену старого пакета. Обновите собственные команды запуска; для polkit без пароля используется группа `nothing_helper`. После добавления в группу выйдите из сеанса и войдите снова.
+
+Если нового `nothing_helper/devices.json` ещё нет, приложение читает настройки из прежнего `tws_manager/devices.json`; последующие сохранения идут в новый каталог. На macOS изменён идентификатор приложения, поэтому система может снова запросить доступ к Bluetooth.
+
 ## Автозапуск и rootless
 
-- Для desktop-автозапуска используется XDG entry: `packaging/common/tws_manager-autostart.desktop` (`--auto --notify --privilege-helper=polkit`).
+- Для desktop-автозапуска используется XDG entry: `packaging/common/nothing_helper-autostart.desktop` (`--auto --notify --privilege-helper=polkit`).
 - GUI-поток по умолчанию использует `--privilege-helper=auto`: сначала polkit helper, затем sudo fallback с запросом пароля в окне.
 - Rootless режим предполагает policy/rules и helper:
-  - `packaging/common/org.tws_manager.rfcomm.policy`
-  - `packaging/common/90-tws_manager.rules`
-  - `cmd/tws_manager_rfcomm_helper`
-- **Группа `tws_manager` обязательна** для автозапуска без polkit-пароля: правило polkit разрешает bind/release/chown только участникам группы. Без группы каждый bind через `pkexec` будет спрашивать пароль администратора.
-- После `sudo usermod -aG tws_manager $USER` нужен **полный logout/login** (перезапуск только GUI недостаточно).
-- Проверка: `groups | grep tws_manager`, затем `pkexec /usr/libexec/tws_manager_rfcomm_helper bind --number 0 --addr <MAC> --channel 15 --owner $(id -u):$(id -g)` — без диалога пароля и с появлением `/dev/rfcomm0`.
+  - `packaging/common/org.nothing_helper.rfcomm.policy`
+  - `packaging/common/90-nothing_helper.rules`
+  - `cmd/nothing_helper_rfcomm_helper`
+- **Группа `nothing_helper` обязательна** для автозапуска без polkit-пароля: правило polkit разрешает bind/release/chown только участникам группы. Без группы каждый bind через `pkexec` будет спрашивать пароль администратора.
+- После `sudo usermod -aG nothing_helper $USER` нужен **полный logout/login** (перезапуск только GUI недостаточно).
+- Проверка: `groups | grep nothing_helper`, затем `pkexec /usr/libexec/nothing_helper_rfcomm_helper bind --number 0 --addr <MAC> --channel 15 --owner $(id -u):$(id -g)` — без диалога пароля и с появлением `/dev/rfcomm0`.
 
 ## Безопасность
 
@@ -157,41 +186,44 @@ Feature-команды в UI: `anc`, `eq`, `spatial`, `lag`, `dual` - с учё�
 
 - `packaging/debian` - debian control/rules/install scripts
 - `packaging/arch/PKGBUILD` - Arch/Manjaro package recipe
-- `packaging/fedora/tws_manager.spec` - Fedora RPM spec
+- `packaging/fedora/nothing_helper.spec` - Fedora RPM spec
 - `packaging/macos` - universal `.app` + DMG (только macOS)
 - `packaging/common` - общие desktop/polkit/sysusers файлы
 
-Вспомогательные цели:
+Сборка пакетов выполняется на целевой ОС, из корня репозитория:
 
 ```bash
-make build-helper
-make build-gio-package
-make package-deb              # .deb -> dist/tws-manager_<version>-1_<arch>.deb
-make package-arch             # Arch pkg -> dist/
-make package-rpm
-make package-macos            # macOS: dist/Nothing_helper-<version>-universal.dmg
-make client-bundle-linux      # portable tarball -> dist/Nothing_helper-<version>-linux-amd64.tar.gz
+make package-deb PKG_VERSION=1.2.0
+# dist/nothing-helper_1.2.0-1_<arch>.deb
+make bundle-linux PKG_VERSION=1.2.0
+# dist/Nothing_helper-1.2.0-linux-<arch>.tar.gz
+make macos-app VERSION=1.2.0
+# dist/Nothing_helper.app (native architecture)
+make package-macos VERSION=1.2.0
+# dist/Nothing_helper-1.2.0-universal.dmg (Intel + Apple Silicon)
 ```
 
-Версия для локальной сборки (опционально):
+Linux-пакет и архив собираются для архитектуры текущего Go toolchain (`go env GOARCH`). `ARCH` не включает кросс-компиляцию; для arm64 используйте arm64-систему с соответствующими CGO-зависимостями. Архив содержит только GUI и helper, без системных библиотек и установки polkit. `make client-bundle-linux` сохранён как алиас `make bundle-linux`.
 
-```bash
-./scripts/pkg-version.sh      # tag / APP_VERSION / 0.0.0~dev.<sha>
-VERSION=0.2.0 make package-macos
-PKG_VERSION=0.2.0 make client-bundle-linux
-```
+Для `.deb` сначала выполните `make install-deps-debian`. Пакеты релиза v1.2.0 собраны на Ubuntu 24.04 и требуют GTK/GLib `t64` (поколение Ubuntu 24.04 / Debian 13).
+
+Для Arch установите зависимости через `make install-deps-arch`, задайте `pkgver` в `packaging/arch/PKGBUILD`, затем выполните `make package-arch`. Результат: `dist/nothing_helper-<pkgver>-1-<arch>.pkg.tar.zst`.
+
+RPM — отдельный рецепт для Fedora: `make package-rpm` требует настроенного дерева `rpmbuild`, версии в `packaging/fedora/nothing_helper.spec` и исходного архива `nothing_helper-<version>.tar.gz` в его каталоге `SOURCES`. Результаты находятся в каталоге `RPMS` дерева rpmbuild; в релиз v1.2.0 RPM не входит.
+
+Для локальной сборки задавайте версию явно, как выше. Без неё Debian и Linux-архив используют `APP_VERSION`, тег из `GITHUB_REF` в CI либо `0.0.0~dev.<sha>`; локальный checkout тега сам по себе не задаёт версию. Скрипты macOS без `VERSION` используют `0.1.0`. Версию Arch/RPM задаёт соответствующий рецепт.
 
 ### Post-install (rootless)
 
-- **Debian/Ubuntu (`.deb`)**: `postinst` пытается автоматически создать группу `tws_manager` и добавить пользователя. Если не удалось, выводит ручную команду `usermod`.
-- **Arch/Manjaro**: пользователь в группу **не добавляется автоматически** (в отличие от `.deb`). После установки пакета выполните `sudo usermod -aG tws_manager $USER` и перелогиньтесь — иначе autostart будет запрашивать polkit-пароль и не создаст `/dev/rfcomm0` для SPP-сессии.
-- **Fedora/RPM**: создаётся группа через `sysusers`, а `post` выводит инструкции по добавлению пользователя в `tws_manager`.
+- **Debian/Ubuntu (`.deb`)**: `postinst` пытается автоматически создать группу `nothing_helper` и добавить пользователя. Если не удалось, выводит ручную команду `usermod`.
+- **Arch/Manjaro**: пользователь в группу **не добавляется автоматически** (в отличие от `.deb`). После установки пакета выполните `sudo usermod -aG nothing_helper $USER` и перелогиньтесь — иначе autostart будет запрашивать polkit-пароль и не создаст `/dev/rfcomm0` для SPP-сессии.
+- **Fedora/RPM**: создаётся группа через `sysusers`, а `post` выводит инструкции по добавлению пользователя в `nothing_helper`.
 
 ## Структура проекта
 
 ```
-cmd/tws_manager/          Companion entrypoint
-cmd/tws_manager_rfcomm_helper/ privileged helper for polkit
+cmd/nothing_helper/          Companion entrypoint
+cmd/nothing_helper_rfcomm_helper/ privileged helper for polkit
 internal/
   app/                    флаги, bootstrap, shutdown
   session/                RFCOMM-сессия, read loop, probe
@@ -211,10 +243,13 @@ internal/
 ## Разработка
 
 ```bash
-go test ./...                              # все тесты
-go test ./internal/spp -run Test           # протокол
-go test ./internal/session -run Test         # сессия
-gofmt -w cmd internal && make test         # форматирование + тесты
+make fmt
+make check          # vet + tests + race tests
+make check-gui      # vet + race tests with gio systray
+# Linux X11/XWayland:
+make check-gui GUI_TAGS="gio systray nowayland"
+go test ./internal/spp -run Test
+go test ./internal/session -run Test
 ```
 
 После изменений в `cmd/` или `internal/` имеет смысл прогнать полный тестовый набор перед коммитом.
@@ -232,7 +267,8 @@ GitHub Actions в `.github/workflows/`:
 Релиз:
 
 ```bash
-git tag v0.2.0 && git push origin v0.2.0
+git tag -a v1.2.1 -m "Nothing_helper v1.2.1"  # example: choose an unused version
+git push origin v1.2.1
 ```
 
 Оба release-workflow прикрепляют артефакты к одному черновику GitHub Release; публикуйте его после проверки всех сборок (`Nothing_helper v<version>`). Ручной запуск: **Actions → Release Linux client / Release macOS client → Run workflow** (опционально переопределить версию).

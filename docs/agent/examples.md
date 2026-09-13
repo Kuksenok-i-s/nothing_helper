@@ -9,7 +9,7 @@ Patterns copied from the codebase. Use these as templates — do not invent para
 TUI wires flags → runtime → services → UI:
 
 ```go
-// cmd/tws_manager/main.go (simplified)
+// cmd/nothing_helper/main.go (simplified)
 flags := app.RegisterFlags(fs, app.ProfileCLI)
 cfg, err := app.ConfigFromFlags(flags)
 
@@ -313,7 +313,7 @@ if err == nil {
 ## Trace / debug
 
 ```bash
-go run ./cmd/tws_manager --device /dev/rfcomm0 \
+go run -tags "gio systray" ./cmd/nothing_helper --device /dev/rfcomm0 \
   --log captures/session.ndjson --log-raw
 ```
 

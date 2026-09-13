@@ -15,9 +15,9 @@ import (
 	"gioui.org/op"
 	"gioui.org/unit"
 
-	"tws_manager/internal/bt"
-	"tws_manager/internal/session"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/bt"
+	"nothing_helper/internal/session"
+	"nothing_helper/internal/spp"
 )
 
 type previewBackend struct{}

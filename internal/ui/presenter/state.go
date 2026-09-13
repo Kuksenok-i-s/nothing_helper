@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"tws_manager/internal/bt"
-	"tws_manager/internal/session"
-	"tws_manager/internal/spp"
-	"tws_manager/internal/trace"
+	"nothing_helper/internal/bt"
+	"nothing_helper/internal/session"
+	"nothing_helper/internal/spp"
+	"nothing_helper/internal/trace"
 )
 
 // State holds UI-agnostic presentation state derived from session events.

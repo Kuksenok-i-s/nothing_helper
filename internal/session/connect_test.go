@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"tws_manager/internal/bt"
-	"tws_manager/internal/security"
+	"nothing_helper/internal/bt"
+	"nothing_helper/internal/security"
 )
 
 func TestNormalizeConnectMACInvalid(t *testing.T) {

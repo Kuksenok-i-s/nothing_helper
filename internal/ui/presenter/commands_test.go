@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/spp"
 )
 
 func TestToggleFeatures(t *testing.T) {

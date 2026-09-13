@@ -62,7 +62,7 @@ See [examples.md § Session safety tests](examples.md#session-tx--rx--safety).
 
 | Symptom | Check |
 |---------|-------|
-| Permission denied | `--privilege-helper`, polkit helper path, `tws_manager` group |
+| Permission denied | `--privilege-helper`, polkit helper path, `nothing_helper` group |
 | Stale device node | `bt.ReviveRFCOMMDevice` in `internal/bt/bt.go` |
 | Double connect wedge | `session.Connect` idempotent guard (same MAC) |
 | Auto-reconnect spam | `internal/connect/autodiscover.go` → `AutoConnect`, `ConnectBest` |
@@ -114,7 +114,7 @@ Edit `internal/spp/models.go`:
 
 ```bash
 # Capture session (user runs on Linux with device)
-go run ./cmd/tws_manager --device /dev/rfcomm0 \
+go run -tags "gio systray" ./cmd/nothing_helper --device /dev/rfcomm0 \
   --log captures/session.ndjson --log-raw
 
 # Agent-side unit tests

@@ -1,4 +1,4 @@
-# SocratiCode index exclusions for nothing_helper (tws_manager).
+# SocratiCode index exclusions for nothing_helper (nothing_helper).
 # Syntax matches .gitignore. Applied after built-in defaults and .gitignore.
 
 # Runtime session captures (NDJSON traces with optional raw bytes)

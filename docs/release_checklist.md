@@ -10,9 +10,9 @@
 ## Packaging consistency
 
 - [ ] Debian package installs helper, polkit files, autostart desktop entry.
-- [ ] Debian `postinst` creates `tws_manager` group and prints manual fallback.
-- [ ] Arch `PKGBUILD` references `tws_manager.install`.
-- [ ] Arch `tws_manager.install` prints `usermod` + relogin instructions.
+- [ ] Debian `postinst` creates `nothing_helper` group and prints manual fallback.
+- [ ] Arch `PKGBUILD` references `nothing_helper.install`.
+- [ ] Arch `nothing_helper.install` prints `usermod` + relogin instructions.
 - [ ] Fedora spec installs same helper/polkit assets and prints group instructions in `%post`.
 
 ## Technical hygiene

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"tws_manager/internal/audio"
-	"tws_manager/internal/bt"
+	"nothing_helper/internal/audio"
+	"nothing_helper/internal/bt"
 )
 
 var (

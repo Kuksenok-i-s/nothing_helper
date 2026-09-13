@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 	"time"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/spp"
 )
 
 func TestCloseWaitsForFindStopBeforeClosingTransport(t *testing.T) {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"tws_manager/internal/dualpolicy"
-	"tws_manager/internal/session"
-	"tws_manager/internal/spp"
+	"nothing_helper/internal/dualpolicy"
+	"nothing_helper/internal/session"
+	"nothing_helper/internal/spp"
 )
 
 // Controller tracks dual PC-primary prompt state shared by TUI and Gio.

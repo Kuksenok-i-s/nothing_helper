@@ -15,7 +15,7 @@ gofmt -w cmd internal && make test         # format + tests
 
 | Tag | Effect |
 |-----|--------|
-| `gio` | Gio GUI (`cmd/tws_manager`, `internal/ui/companion/...`) |
+| `gio` | Gio GUI (`cmd/nothing_helper`, `internal/ui/companion/...`) |
 | `systray` | Real tray (`internal/ui/tray/tray_systray.go`) vs no-op stub |
 
 ## Make targets
@@ -37,8 +37,8 @@ Requires **Go 1.26+**, BlueZ, Linux. Gio needs `vulkan-headers`; tray needs `lib
 
 ```bash
 # macOS — Gio GUI
-go build -tags "gio systray" -o bin/tws_manager ./cmd/tws_manager
-./packaging/macos/bundle.sh && open dist/tws_manager.app
+go build -tags "gio systray" -o bin/nothing_helper ./cmd/nothing_helper
+./packaging/macos/bundle.sh && open dist/nothing_helper.app
 
 # macOS — full release-style bundle + DMG
 VERSION=0.2.0 make package-macos
@@ -78,10 +78,10 @@ When changing packaging or Make targets used by CI, verify locally then check th
 |----------|------|
 | Debian | `packaging/debian/` (`make package-deb` symlinks `debian/` and copies `.deb` to `dist/`) |
 | Arch | `packaging/arch/PKGBUILD` |
-| Fedora | `packaging/fedora/tws_manager.spec` |
-| macOS DMG | `packaging/macos/` → `dist/tws_manager-<version>-universal.dmg` |
-| Linux portable | `make client-bundle-linux` → `dist/tws_manager-<version>-linux-amd64.tar.gz` |
-| Polkit policy | `packaging/common/org.tws_manager.rfcomm.policy` |
+| Fedora | `packaging/fedora/nothing_helper.spec` |
+| macOS DMG | `packaging/macos/` → `dist/nothing_helper-<version>-universal.dmg` |
+| Linux portable | `make client-bundle-linux` → `dist/nothing_helper-<version>-linux-amd64.tar.gz` |
+| Polkit policy | `packaging/common/org.nothing_helper.rfcomm.policy` |
 | Desktop entry | `packaging/common/*.desktop` |
 
-Post-install: user may need `tws_manager` group membership for rootless RFCOMM (varies by distro — see [README.md](../../README.md)).
+Post-install: user may need `nothing_helper` group membership for rootless RFCOMM (varies by distro — see [README.md](../../README.md)).
