@@ -45,6 +45,10 @@ func (v *view) deviceArt(gtx layout.Context, c *Controller, s Snapshot) layout.D
 				})
 			})
 			state, known := WearKnown(s.Session, side, time.Now())
+			if known {
+				// Expire the wear indicator even when no session event arrives.
+				gtx.Execute(op.InvalidateCmd{At: state.UpdatedAt.Add(30*time.Second + time.Nanosecond)})
+			}
 			at(35, 58, 76, func(gtx layout.Context) layout.Dimensions {
 				click := v.click("find-" + side)
 				active := s.FindSide == side

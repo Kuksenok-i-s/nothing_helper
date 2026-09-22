@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"gioui.org/app"
 	"gioui.org/io/system"
@@ -29,6 +30,7 @@ func Run(ctx context.Context, opts Options) error {
 	c.Start()
 	var mu sync.Mutex
 	var current *app.Window
+	var redraw redrawState
 	wake := make(chan struct{}, 1)
 	go func() {
 		for {
@@ -45,7 +47,7 @@ func Run(ctx context.Context, opts Options) error {
 				mu.Lock()
 				w := current
 				mu.Unlock()
-				if w != nil {
+				if w != nil && redraw.changed(c.Snapshot(), time.Now()) {
 					w.Invalidate()
 				}
 			case <-opts.ShowCh:
@@ -75,7 +77,7 @@ func Run(ctx context.Context, opts Options) error {
 			mu.Lock()
 			current = w
 			mu.Unlock()
-			err := windowLoop(ctx, w, c, ui)
+			err := windowLoop(ctx, w, c, ui, &redraw)
 			mu.Lock()
 			current = nil
 			mu.Unlock()
@@ -106,7 +108,7 @@ func finish(opts Options, code int) {
 	}
 	os.Exit(code)
 }
-func windowLoop(ctx context.Context, w *app.Window, c *Controller, ui *view) error {
+func windowLoop(ctx context.Context, w *app.Window, c *Controller, ui *view, redraw *redrawState) error {
 	var ops op.Ops
 	for {
 		switch e := w.Event().(type) {
@@ -118,7 +120,9 @@ func windowLoop(ctx context.Context, w *app.Window, c *Controller, ui *view) err
 				continue
 			}
 			gtx := app.NewContext(&ops, e)
-			ui.Layout(gtx, c, c.Snapshot())
+			snap := c.Snapshot()
+			redraw.record(snap, ui.page, gtx.Now)
+			ui.Layout(gtx, c, snap)
 			e.Frame(gtx.Ops)
 		}
 	}

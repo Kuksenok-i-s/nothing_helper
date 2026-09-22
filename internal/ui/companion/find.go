@@ -21,12 +21,16 @@ func (b sessionBackend) Find(ctx context.Context, side string) error {
 	return b.s.FindEarbud(ctx, side)
 }
 func (c *Controller) RefreshWear() {
+	c.refreshWear(false)
+}
+
+func (c *Controller) refreshWear(background bool) {
 	reader, ok := c.backend.(statusReader)
 	if !ok {
 		return
 	}
 	mac, generation := c.token()
-	c.submit("Обновление датчиков", func() error {
+	c.submitWork("Обновление датчиков", func() error {
 		if !c.sameConnection(mac, generation) {
 			return nil
 		}
@@ -44,7 +48,7 @@ func (c *Controller) RefreshWear() {
 			}
 		}
 		return nil
-	})
+	}, background)
 }
 func (c *Controller) Find(side string) {
 	if side != "left" && side != "right" {

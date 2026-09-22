@@ -61,8 +61,9 @@ type Snapshot struct {
 	Logs                                      []string
 }
 type work struct {
-	label string
-	run   func() error
+	label      string
+	run        func() error
+	background bool
 }
 type Controller struct {
 	mu             sync.Mutex
@@ -74,6 +75,7 @@ type Controller struct {
 	presenter      *presenter.State
 	devices        []bt.Device
 	pending        int
+	background     int
 	generation     uint64
 	auto           bool
 	target         bt.Device
@@ -101,7 +103,7 @@ func (c *Controller) Snapshot() Snapshot {
 	snap := c.backend.Snapshot()
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return Snapshot{FindSide: c.findSide, Session: snap, Devices: append([]bt.Device(nil), c.devices...), Status: c.presenter.Status, Error: c.presenter.Err, Busy: c.pending > 0, Logs: append([]string(nil), c.presenter.LogLines...), PasswordPrompt: c.passwordPrompt, DualPrompt: c.dual.PromptLine()}
+	return Snapshot{FindSide: c.findSide, Session: snap, Devices: append([]bt.Device(nil), c.devices...), Status: c.presenter.Status, Error: c.presenter.Err, Busy: c.pending > c.background, Logs: append([]string(nil), c.presenter.LogLines...), PasswordPrompt: c.passwordPrompt, DualPrompt: c.dual.PromptLine()}
 }
 func (c *Controller) Start() {
 	events := c.backend.Subscribe()
@@ -155,23 +157,32 @@ func (c *Controller) Start() {
 				if auto && idle && !c.backend.Snapshot().Connected {
 					c.Connect()
 				} else if idle && c.backend.Snapshot().Connected {
-					c.RefreshWear()
+					c.refreshWear(true)
 				}
 			}
 		}
 	}()
 }
 func (c *Controller) submit(label string, fn func() error) bool {
+	return c.submitWork(label, fn, false)
+}
+
+func (c *Controller) submitWork(label string, fn func() error, background bool) bool {
 	c.mu.Lock()
-	if c.ctx.Err() != nil {
+	if c.ctx.Err() != nil || background && c.pending != 0 {
 		c.mu.Unlock()
 		return false
 	}
 	c.pending++
 	select {
-	case c.queue <- work{label, fn}:
+	case c.queue <- work{label: label, run: fn, background: background}:
+		if background {
+			c.background++
+		}
 		c.mu.Unlock()
-		c.changedState()
+		if !background {
+			c.changedState()
+		}
 		return true
 	default:
 		c.pending--
@@ -191,20 +202,29 @@ func (c *Controller) worker() {
 				return
 			}
 			c.mu.Lock()
-			c.presenter.Status = job.label
-			c.presenter.Err = ""
+			if !job.background {
+				c.presenter.Status = job.label
+				c.presenter.Err = ""
+			}
 			c.mu.Unlock()
-			c.changedState()
+			if !job.background {
+				c.changedState()
+			}
 			err := job.run()
 			c.mu.Lock()
 			c.pending--
+			if job.background {
+				c.background--
+			}
 			if err != nil {
 				c.presenter.Err = err.Error()
-			} else if c.presenter.Status == job.label {
+			} else if !job.background && c.presenter.Status == job.label {
 				c.presenter.Status = job.label + " · готово"
 			}
 			c.mu.Unlock()
-			c.changedState()
+			if !job.background || err != nil {
+				c.changedState()
+			}
 		}
 	}
 }
